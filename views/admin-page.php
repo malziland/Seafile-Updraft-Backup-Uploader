@@ -76,10 +76,10 @@ defined( 'ABSPATH' ) || exit;
                 <p><?php echo wp_kses_post( __( 'Jede Datei wird zuerst als ganzes Stück geholt — derselbe Weg, den die Seafile-Weboberfläche nutzt. Klappt das nicht oder ist die Datei zu groß (über 500 MB), wechselt das Plugin automatisch auf Stücke. Läuft beides nicht sauber, werden die Pausen länger und du bekommst nach einer Stunde eine Info-Mail — abgebrochen wird nichts.', 'seafile-updraft-backup-uploader' ) ); ?></p>
             </div>
         </div>
+        <p class="sbu-info-integrity"><?php echo wp_kses_post( __( '<strong>🔒 Integritätsprüfung läuft automatisch:</strong> Beim Upload wird für jede Backup-Datei eine Prüfsumme berechnet und gespeichert. Beim Wiederherstellen wird jede heruntergeladene Datei gegen diese Prüfsumme geprüft — fällt ein Fehler auf, wird die Datei als beschädigt markiert. Das geschieht ohne zusätzliche Bandbreite.', 'seafile-updraft-backup-uploader' ) ); ?></p>
         <ul>
             <li><?php esc_html_e( 'Keine Dateigrößen-Begrenzung — auch Multi-GB-Dateien funktionieren', 'seafile-updraft-backup-uploader' ); ?></li>
             <li><?php esc_html_e( 'Reverse-Proxy-kompatibel (Cloudflare Tunnel Free Tier, 100-MB-Upload-Limit)', 'seafile-updraft-backup-uploader' ); ?></li>
-            <li><?php esc_html_e( 'Integritätsprüfung beim Wiederherstellen (Prüfsumme pro Datei, ohne Extra-Bandbreite)', 'seafile-updraft-backup-uploader' ); ?></li>
             <li><?php esc_html_e( 'Läuft ohne externen Cron und ohne Seiten-Traffic — WordPress-internes Loopback hält die Queue am Leben', 'seafile-updraft-backup-uploader' ); ?></li>
             <li><?php esc_html_e( 'Dashboard-Widget, E-Mail-Alerts bei Fehler oder Stillstand, automatische Aufbewahrung', 'seafile-updraft-backup-uploader' ); ?></li>
         </ul>
@@ -175,10 +175,6 @@ defined( 'ABSPATH' ) || exit;
                     </div>
 
                     <div class="ff">
-                        <p class="hint"><?php esc_html_e( 'Integritätsprüfung läuft automatisch: Beim Upload wird für jede Backup-Datei eine Prüfsumme berechnet und gespeichert. Beim Wiederherstellen wird jede heruntergeladene Datei gegen diese Prüfsumme geprüft — fällt ein Fehler auf, wird die Datei als beschädigt markiert. Das geschieht ohne zusätzliche Bandbreite.', 'seafile-updraft-backup-uploader' ); ?></p>
-                    </div>
-
-                    <div class="ff">
                         <label>
                             <input type="checkbox" name="<?php echo esc_attr( SBU_OPT ); ?>[debug_log]" value="1"<?php checked( $s['debug_log'], 1 ); ?> />
                             <?php esc_html_e( 'Detailliertes Debug-Log (TICK, BATCH, CHUNK)', 'seafile-updraft-backup-uploader' ); ?>
@@ -239,16 +235,20 @@ defined( 'ABSPATH' ) || exit;
             <div class="card" id="logcard">
                 <h2><span class="icon">📋</span><?php esc_html_e( 'Aktivitätsprotokoll', 'seafile-updraft-backup-uploader' ); ?></h2>
                 <div class="log-acts">
-                    <label for="sbu-log-filter" class="sbu-log-filter-label"><?php esc_html_e( 'Filter:', 'seafile-updraft-backup-uploader' ); ?></label>
-                    <select id="sbu-log-filter" class="sbu-log-filter">
-                        <option value="all"><?php esc_html_e( 'Alle', 'seafile-updraft-backup-uploader' ); ?></option>
-                        <option value="errors"><?php esc_html_e( 'Nur Fehler', 'seafile-updraft-backup-uploader' ); ?></option>
-                        <option value="restore"><?php esc_html_e( 'Restore-Flow', 'seafile-updraft-backup-uploader' ); ?></option>
-                        <option value="debug"><?php esc_html_e( 'Nur Debug', 'seafile-updraft-backup-uploader' ); ?></option>
-                    </select>
-                    <button class="button button-small" onclick="sbuExportLog()"><?php esc_html_e( 'Als Textdatei exportieren', 'seafile-updraft-backup-uploader' ); ?></button>
-                    <button class="button button-small" onclick="sbuExportLogAnon()" title="<?php esc_attr_e( 'Domain, Bibliotheks-ID und Ordnerpfad werden im Export maskiert — zum Teilen mit Support, ohne Datenschutz-Bedenken.', 'seafile-updraft-backup-uploader' ); ?>"><?php esc_html_e( 'Anonymisiert exportieren', 'seafile-updraft-backup-uploader' ); ?></button>
-                    <button class="button button-small" onclick="sbuClearLog()" style="color:#b32d2e"><?php esc_html_e( 'Log leeren', 'seafile-updraft-backup-uploader' ); ?></button>
+                    <div class="log-acts-filter">
+                        <label for="sbu-log-filter" class="sbu-log-filter-label"><?php esc_html_e( 'Filter:', 'seafile-updraft-backup-uploader' ); ?></label>
+                        <select id="sbu-log-filter" class="sbu-log-filter">
+                            <option value="all"><?php esc_html_e( 'Alle', 'seafile-updraft-backup-uploader' ); ?></option>
+                            <option value="errors"><?php esc_html_e( 'Nur Fehler', 'seafile-updraft-backup-uploader' ); ?></option>
+                            <option value="restore"><?php esc_html_e( 'Restore-Flow', 'seafile-updraft-backup-uploader' ); ?></option>
+                            <option value="debug"><?php esc_html_e( 'Nur Debug', 'seafile-updraft-backup-uploader' ); ?></option>
+                        </select>
+                    </div>
+                    <div class="log-acts-buttons">
+                        <button class="button button-small" onclick="sbuExportLog()"><?php esc_html_e( 'Als Textdatei exportieren', 'seafile-updraft-backup-uploader' ); ?></button>
+                        <button class="button button-small" onclick="sbuExportLogAnon()" title="<?php esc_attr_e( 'Domain, Bibliotheks-ID und Ordnerpfad werden im Export maskiert — zum Teilen mit Support, ohne Datenschutz-Bedenken.', 'seafile-updraft-backup-uploader' ); ?>"><?php esc_html_e( 'Anonymisiert exportieren', 'seafile-updraft-backup-uploader' ); ?></button>
+                        <button class="button button-small" onclick="sbuClearLog()" style="color:#b32d2e"><?php esc_html_e( 'Log leeren', 'seafile-updraft-backup-uploader' ); ?></button>
+                    </div>
                 </div>
                 <?php if ( $activity ) : ?>
                     <div class="sbu-al" id="alc"><?php echo $this->format_activity_log( $activity ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — format_activity_log returns pre-escaped HTML with span-wrapped log lines. ?></div>

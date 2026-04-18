@@ -30,6 +30,7 @@
 .sbu .sbu-info-twocol{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0}
 .sbu .sbu-info-twocol>div{background:#fff;border:1px solid #dce5ef;border-radius:6px;padding:10px 14px}
 @media(max-width:900px){.sbu .sbu-info-twocol{grid-template-columns:1fr}}
+.sbu .sbu-info-integrity{background:#fff;border:1px solid #dce5ef;border-left:3px solid #00a32a;border-radius:6px;padding:10px 14px;margin:10px 0!important}
 
 /* Restore success banner */
 .sbu .sbu-restore-banner{background:linear-gradient(135deg,#e8f5e9 0%,#f4fbf4 100%);border:1px solid #6fbf73;border-radius:8px;padding:16px 20px 18px;margin-bottom:20px;position:relative}
@@ -138,9 +139,12 @@
 .sbu .sbu-al .del{color:#e8ab6b}
 .sbu .sbu-al .res{color:#b4a0ff}
 .sbu .sbu-al .dim{color:#6a737d}
-.sbu .log-acts{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+.sbu .log-acts{display:flex;gap:10px 16px;margin-bottom:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.sbu .log-acts-filter{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sbu .log-acts-buttons{display:flex;gap:6px;flex-wrap:wrap}
 .sbu .sbu-log-filter-label{font-size:12px;color:#50575e}
 .sbu .sbu-log-filter{font-size:12px;padding:2px 6px;height:26px}
+@media(max-width:600px){.sbu .log-acts{flex-direction:column;align-items:stretch}.sbu .log-acts-buttons{justify-content:flex-start}.sbu .log-acts-buttons .button{flex:1 1 auto}}
 .sbu .log-empty{color:#646970;font-style:italic;padding:12px 0}
 
 /* Upload Progress Banner */

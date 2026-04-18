@@ -4,6 +4,15 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.1] — 2026-04-18
+
+UI-Politur der Einstellungsseite.
+
+### Geändert
+
+- Integritätsprüfungs-Hinweis aus dem Einstellungsblock in den Erklär-Bereich „So funktioniert das Plugin" verschoben — dort gehört er hin, nicht neben die Speichern-Checkboxen.
+- Toolbar im Aktivitätsprotokoll sauber in zwei Gruppen aufgeteilt (Filter links, Exporte + Log leeren rechts). Auf schmalen Bildschirmen (< 600 px) stapeln die Gruppen untereinander statt chaotisch umzubrechen, Buttons teilen sich die Breite gleichmäßig.
+
 ## [1.0.0] — 2026-04-18
 
 Erste öffentliche Version.
