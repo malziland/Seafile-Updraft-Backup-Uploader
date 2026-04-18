@@ -1,0 +1,61 @@
+# Changelog
+
+Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert.
+
+Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
+
+## [1.0.0] — 2026-04-18
+
+Erste öffentliche Version.
+
+### Überblick
+
+Das Plugin koppelt UpdraftPlus an einen selbst gehosteten Seafile-Server über die native Seafile-Upload-API — nicht über WebDAV. Das ist notwendig, weil WebDAV auf Seafile keine Chunked Uploads unterstützt: Dateien größer als das Reverse-Proxy-Limit (etwa 100 MB bei Cloudflare Tunnel Free Tier) lassen sich über WebDAV schlicht nicht hochladen.
+
+### Funktionsumfang
+
+- **Chunked Upload** (Default 40 MB pro Stück, konfigurierbar 5–90 MB) — schlägt keine 100-MB-Grenze, jedes übertragene Stück bleibt gesichert, bei Fehler wird nur das fehlgeschlagene Stück wiederholt.
+- **Stream-First-Restore** — Downloads nutzen zuerst denselben Pfad wie die Seafile-Web-Oberfläche (ein einzelner HTTP-GET ohne Range-Header). Für Dateien über 500 MB oder wenn der Stream scheitert, fällt das Plugin automatisch auf parallele Range-Chunks zurück.
+- **Adaptive Konfiguration ohne Einstellungen** — Tick-Länge, Parallelität und Chunk-Größe werden beim Restore automatisch aus `max_execution_time` und `memory_limit` berechnet. Der Nutzer sieht die gewählten Werte beim Restore-Start im Activity-Log.
+- **Exponentielles Backoff mit zwei Kurven** — unterscheidet zwischen leeren Server-Antworten (Backend kalt, 60 s / 300 s / 900 s / 1800 s / 3600 s) und echten Transportfehlern (Netzwerk wackelt, 60 s / 120 s / 240 s / 480 s / …). Harte Obergrenze 1 Stunde.
+- **AIMD-Rate-Controller** — Chunk-Größe und Parallelität schrumpfen nach Fehlern und wachsen nach erfolgreichen Batches gestaffelt zurück. Zwei Fehler in Folge drücken den Flow in einen Emergency-Modus (2 MB × 1 Stream).
+- **Stillstand-Meldung per Mail ohne Abbruch** — wenn eine Datei 1 h keinen Fortschritt macht, geht eine Info-Mail raus. Folge-Mails alle 4 h. Die Queue wird nicht abgebrochen, sie läuft mit frischen Download-Links weiter, bis sie durch ist.
+- **Integritätsprüfung ohne Extra-Bandbreite** — beim Upload wird pro Datei streamend eine SHA1-Prüfsumme berechnet und persistiert. Beim Wiederherstellen wird dieselbe Prüfsumme aus dem Download-Stream gebildet und verglichen. Mismatch ⇒ Datei wird als Fehler markiert.
+- **Pause & Resume** — Uploads und Restores lassen sich pausieren und an exakt derselben Byte-Position fortsetzen. Abbrechen bleibt als separate Aktion.
+- **Zero-Traffic-Betrieb** — das Plugin läuft vollständig ohne externe Dienste und ohne Besucher auf der Seite. Ein interner WordPress-Loopback zieht jeden Tick nach, ein Shutdown-Handler feuert nach einem Fatal-Error einen Loopback nach, während Backoff-Phasen wartet `ajax_cron_ping()` in-Process statt abzuprallen. WP-Cron ist nur zusätzliches Sicherheitsnetz.
+- **Optionaler externer Heartbeat** (für Hosting-Umgebungen, die Loopbacks komplett blockieren) — schlüsselgeschützte `admin-ajax.php?action=sbu_cron_ping&key=…`-URL mit Crontab-Beispiel direkt im Admin.
+- **Lokal-Status pro Backup-Set** im Backup-Browser — farbiges Badge „Lokal vollständig / Teilweise lokal / Nur remote", bei vollständig lokalem Set wird der Wiederherstellen-Button durch „In UpdraftPlus öffnen" ersetzt.
+- **Erfolgs-Banner nach Restore** — grüner Kasten mit Backup-Set, Zeitpunkt, Dateianzahl, Größe und Dauer, verlinkt direkt in die UpdraftPlus-Oberfläche.
+- **Anonymisierter Log-Export** — zusätzlicher Export-Button, der Seafile-Host, Library-ID, Ordnerpfad, Benutzer-E-Mail, IPs und UUIDs maskiert. Gedacht zum Teilen im Support ohne Datenschutz-Bedenken.
+- **Kategorisierter Log-Filter im Admin** (Alle / Nur Fehler / Restore-Flow / Nur Debug).
+- **Detailliertes Debug-Log** als Setting — schreibt pro Restore-Chunk eine Zeile mit Byte-Range, Dauer, HTTP-Code, cURL-Fehlernummer und Klassifikation. Nur für konkrete Diagnosen einschalten.
+- **Dashboard-Widget** mit Status des letzten Backups.
+- **E-Mail-Benachrichtigungen** (bei Fehler / immer / nie).
+- **Retention-Management auf Seafile** (4 Default, 0 = alle behalten).
+- **UpdraftPlus-History-Sync** — beim Löschen lokaler Backups nach Upload werden die UpdraftPlus-History-Einträge ohne zugehörige Dateien entfernt.
+- **AES-256-CBC-Passwortverschlüsselung** mit zufälligem IV.
+- **Loopback-Gate** (`next_allowed_tick_ts`) — alle Tick-Entry-Points prüfen das Gate und droppen verfrühte Aufrufe, damit Backoffs nicht durch aggressive Loopback-Spawn-Ketten unterlaufen werden.
+- **Mehrsprachige Oberfläche** (Deutsch + Englisch, über die WordPress-Locale).
+
+### Getestet gegen
+
+Dogfood-Restore vom 18.04.2026: 70 Dateien (etwa 3,4 GB) in 48 Minuten über einen Cloudflare Tunnel Free Tier. `uploads.zip` (194 MB) in 55 Sekunden über den Stream-First-Pfad.
+
+### Tests
+
+87 PHPUnit-Tests / 257 Assertions, alle grün. Getestet werden u. a.:
+- die Backoff-Kurven in `compute_retry_delay()`
+- die adaptive Limits-Heuristik gegen 10 Server-Profile
+- der AIMD-Rate-Controller (Staffel-Erholung aus Emergency)
+- Chunk-Fehlerklassifikation über alle sieben Kategorien
+- Pause/Resume-Roundtrip mit Byte-Offset-Erhalt
+- Legacy-IV-Migration in `SBU_Crypto`
+
+### Anforderungen
+
+- WordPress 6.0+
+- PHP 7.4+
+- UpdraftPlus (Free oder Premium)
+- Ein Seafile-Server (self-hosted oder Cloud)
+
+[1.0.0]: https://github.com/malziland/seafile-updraft-backup-uploader/releases/tag/v1.0.0

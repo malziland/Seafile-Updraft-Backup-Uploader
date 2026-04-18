@@ -1,0 +1,47 @@
+name: Feature request
+description: Suggest a capability the plugin should have
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests are welcome, but the plugin has a deliberately tight
+        scope: *upload UpdraftPlus backups to Seafile through the native API*.
+        If your idea fits that scope, great. If it's closer to "support
+        Nextcloud too" or "replace UpdraftPlus", it's probably a different
+        plugin.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem you are trying to solve
+      description: What goes wrong today, or what can you not do today?
+      placeholder: |
+        I have a 500 GB backup and scanning every file for SHA1 at queue
+        creation would be too expensive. I'd like a way to verify only a
+        sampled subset.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution (optional)
+      description: How would you solve it if you were writing the code?
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Existing plugins, workarounds, manual scripts, etc.
+
+  - type: checkboxes
+    id: scope-check
+    attributes:
+      label: Scope check
+      options:
+        - label: This is about uploading backups to Seafile, not about other storage backends.
+          required: true
+        - label: This does not require changes to UpdraftPlus itself.
+          required: true

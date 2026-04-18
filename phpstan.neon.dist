@@ -1,0 +1,16 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    treatPhpDocTypesAsCertain: false
+    paths:
+        - seafile-updraft-backup-uploader.php
+        - includes/
+        - views/
+    excludePaths:
+        - vendor/*
+        - languages/*
+        - tests/*
+    bootstrapFiles:
+        - seafile-updraft-backup-uploader.php

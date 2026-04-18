@@ -1,0 +1,45 @@
+{
+    "name": "malziland/seafile-updraft-backup-uploader",
+    "description": "WordPress plugin that uploads UpdraftPlus backups to a self-hosted Seafile server via the native API with chunked upload.",
+    "type": "wordpress-plugin",
+    "license": "MIT",
+    "homepage": "https://github.com/malziland/Seafile-Updraft-Backup-Uploader",
+    "authors": [
+        {
+            "name": "malziland",
+            "email": "info@malziland.at",
+            "homepage": "https://malziland.at"
+        }
+    ],
+    "require": {
+        "php": ">=7.4",
+        "ext-openssl": "*"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.10",
+        "wp-coding-standards/wpcs": "^3.1",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpstan/phpstan": "^2.1",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "phpunit/phpunit": "^9.6",
+        "brain/monkey": "^2.6",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SBU\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "lint": "find . -name '*.php' -not -path './vendor/*' -not -path './.git/*' -print0 | xargs -0 -n1 php -l",
+        "phpcs": "phpcs --standard=WordPress --extensions=php --ignore=vendor,languages,assets,tests,.github .",
+        "phpstan": "phpstan analyse --memory-limit=2G",
+        "test": "phpunit"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}

@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<ruleset name="seafile-updraft-backup-uploader">
+    <description>WordPress Coding Standards for seafile-updraft-backup-uploader</description>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <file>.</file>
+
+    <exclude-pattern>vendor/*</exclude-pattern>
+    <exclude-pattern>languages/*</exclude-pattern>
+    <exclude-pattern>assets/*</exclude-pattern>
+    <exclude-pattern>.github/*</exclude-pattern>
+
+    <rule ref="WordPress">
+        <exclude name="Generic.Arrays.DisallowShortArraySyntax"/>
+        <exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+        <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+    </rule>
+
+    <config name="minimum_wp_version" value="6.0"/>
+    <config name="testVersion" value="7.4-"/>
+
+    <rule ref="PHPCompatibilityWP"/>
+
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="seafile-updraft-backup-uploader"/>
+            </property>
+        </properties>
+    </rule>
+</ruleset>

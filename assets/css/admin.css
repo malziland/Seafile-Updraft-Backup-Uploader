@@ -1,0 +1,176 @@
+/* Base */
+.sbu{max-width:1060px;font-size:13px;overflow-wrap:break-word}
+.sbu *,.sbu *::before,.sbu *::after{box-sizing:border-box}
+.sbu .sbu-btn-bar{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.sbu h1{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sbu .ver{font-size:12px;color:#8c8f94;font-weight:400;background:#f0f0f1;padding:2px 8px;border-radius:10px}
+.sbu p.desc{color:#646970;margin-bottom:24px;line-height:1.7}
+
+/* Two-column grid */
+.sbu .sbu-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+@media(max-width:1100px){.sbu .sbu-grid{grid-template-columns:1fr}}
+
+/* Cards */
+.sbu .card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.sbu .card h2{font-size:15px;font-weight:600;margin:0 0 18px;padding-bottom:14px;border-bottom:1px solid #f0f0f1;color:#1d2327;display:flex;align-items:center;gap:8px}
+.sbu .card h2 .icon{font-size:18px}
+.sbu .sbu-save-status{font-size:11px;font-weight:400;color:#00a32a;opacity:0;transition:opacity .3s;margin-left:auto}
+.sbu .sbu-save-status.show{opacity:1}
+
+/* Info Box */
+.sbu .sbu-info{background:linear-gradient(135deg,#f0f7ff 0%,#f8faff 100%);border:1px solid #c5d9ed;border-radius:8px;padding:18px 24px;margin-bottom:20px;line-height:1.6;font-size:12px;box-sizing:border-box}
+.sbu .sbu-info h3{margin:0 0 6px;font-size:14px;color:#1d2327}
+.sbu .sbu-info h4{margin:4px 0;font-size:13px;color:#1d2327}
+.sbu .sbu-info p{margin:4px 0;color:#3c434a}
+.sbu .sbu-info ul{margin:6px 0;padding-left:0;list-style:none}
+.sbu .sbu-info ul li{padding:2px 0 2px 18px;position:relative;color:#3c434a}
+.sbu .sbu-info ul li:before{content:"\2713";position:absolute;left:0;color:#00a32a;font-weight:700}
+.sbu .sbu-info .setup{background:#fff;border:1px solid #c5d9ed;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:12px}
+.sbu .sbu-info .setup strong{color:#2271b1}
+.sbu .sbu-info-twocol{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0}
+.sbu .sbu-info-twocol>div{background:#fff;border:1px solid #dce5ef;border-radius:6px;padding:10px 14px}
+@media(max-width:900px){.sbu .sbu-info-twocol{grid-template-columns:1fr}}
+
+/* Restore success banner */
+.sbu .sbu-restore-banner{background:linear-gradient(135deg,#e8f5e9 0%,#f4fbf4 100%);border:1px solid #6fbf73;border-radius:8px;padding:16px 20px 18px;margin-bottom:20px;position:relative}
+.sbu .sbu-restore-banner .sbu-restore-banner-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sbu .sbu-restore-banner .sbu-restore-banner-head strong{color:#1b5e20;font-size:14px}
+.sbu .sbu-restore-banner p{margin:4px 0;color:#224822;line-height:1.55}
+.sbu .sbu-restore-banner .sbu-restore-banner-next{color:#33663a;font-size:12px;margin-bottom:10px}
+.sbu .sbu-restore-banner .sbu-restore-dismiss{background:transparent;border:none;font-size:18px;color:#555;cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px}
+.sbu .sbu-restore-banner .sbu-restore-dismiss:hover{background:rgba(0,0,0,.06)}
+
+/* Lokal-Status Badges im Backup-Browser */
+.sbu .sbu-bk-local{display:inline-block;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px;cursor:help;white-space:nowrap}
+.sbu .sbu-bk-local-yes{background:#d4edda;color:#155724}
+.sbu .sbu-bk-local-stale{background:#fff4d6;color:#7a5a00}
+.sbu .sbu-bk-local-remote{background:#eef2f7;color:#455a70}
+
+/* Form Fields */
+.sbu .ff{margin-bottom:18px}
+.sbu .ff>label{display:block;font-weight:500;margin-bottom:6px;color:#1d2327}
+.sbu .ff input[type=text],.sbu .ff input[type=url],.sbu .ff input[type=email],.sbu .ff input[type=password],.sbu .ff input[type=number],.sbu .ff select{width:100%;max-width:420px;padding:6px 10px;border:1px solid #c3c4c7;border-radius:4px}
+.sbu .ff input:focus,.sbu .ff select:focus{border-color:#2271b1;box-shadow:0 0 0 1px #2271b1;outline:none}
+.sbu .ff .hint{margin-top:5px;color:#8c8f94;font-size:12px}
+.sbu .row{display:flex;align-items:center;gap:8px}.sbu .row input[type=number]{width:80px!important}
+.sbu .ff label input[type=checkbox]{margin-right:6px}
+
+/* Action Bar */
+.sbu .acts{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+
+/* Picker Fields */
+.sbu .sbu-picker{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sbu .sbu-picker select{flex:1;max-width:320px;padding:6px 10px;border:1px solid #c3c4c7;border-radius:4px;font-size:13px;background:#fff;height:34px}
+.sbu .sbu-picker select:focus{border-color:#2271b1;box-shadow:0 0 0 1px #2271b1;outline:none}
+.sbu .sbu-picker select:disabled{background:#f0f0f1;color:#8c8f94}
+.sbu .sbu-btn-load,.sbu .sbu-btn-new{height:34px;padding:0 14px;border:1px solid #c3c4c7;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;font-weight:500;color:#50575e;transition:all .15s;white-space:nowrap}
+.sbu .sbu-btn-load:hover,.sbu .sbu-btn-new:hover{background:#f0f6fc;border-color:#2271b1;color:#2271b1}
+.sbu .sbu-btn-load:disabled,.sbu .sbu-btn-new:disabled{opacity:.4;cursor:not-allowed;background:#f0f0f1}
+.sbu .sbu-btn-load.loading,.sbu .sbu-btn-new.loading{pointer-events:none;color:transparent;position:relative;min-width:60px}
+.sbu .sbu-btn-load.loading::after,.sbu .sbu-btn-new.loading::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #c3c4c7;border-top-color:#2271b1;border-radius:50%;animation:sbu-spin .6s linear infinite}
+@keyframes sbu-spin{to{transform:rotate(360deg)}}
+.sbu .sbu-picker-status{display:inline-flex;align-items:center;gap:4px;font-size:11px;margin-left:2px;opacity:0;transition:opacity .3s}
+.sbu .sbu-picker-status.show{opacity:1}
+.sbu .sbu-picker-status.ok{color:#00a32a}
+.sbu .sbu-picker-status.er{color:#d63638}
+.sbu .sbu-newdir{display:none;align-items:center;gap:6px;margin-top:6px}
+.sbu .sbu-newdir input{flex:1;max-width:250px;padding:5px 10px;border:1px solid #c3c4c7;border-radius:4px;font-size:13px}
+.sbu .sbu-newdir .sbu-btn-text{padding:5px 14px;border:1px solid #2271b1;border-radius:4px;background:#2271b1;color:#fff;font-size:12px;cursor:pointer;white-space:nowrap}
+.sbu .sbu-newdir .sbu-btn-text:hover{background:#135e96}
+.sbu .sbu-newdir .sbu-btn-cancel{padding:5px 10px;border:1px solid #c3c4c7;border-radius:4px;background:#fff;color:#50575e;font-size:12px;cursor:pointer}
+.sbu .sbu-newdir .sbu-btn-cancel:hover{border-color:#8c8f94}
+
+/* Result Box */
+.sbu #sr{margin-top:14px;padding:14px 18px;border-radius:6px;display:none;font-size:13px;line-height:1.6}
+.sbu #sr.ok{background:#f0faf0;border:1px solid #00a32a;color:#1a4a1a}
+.sbu #sr.er{background:#fef5f5;border:1px solid #d63638;color:#5a1a1a}
+.sbu #sr.ld{background:#f0f6fc;border:1px solid #72aee6;color:#1a3a5a}
+
+/* Log */
+.sbu .lg{background:#1a1d21;color:#d4d4d4;padding:18px 20px;border-radius:6px;max-height:320px;overflow:auto;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:11px;line-height:1.9;white-space:pre-wrap;word-break:break-all}
+.sbu .lg .g{color:#73c991}.sbu .lg .e{color:#f48771}.sbu .lg .b{color:#7dc4e4}
+
+/* Backup Cards */
+.sbu .sbu-bk{border:1px solid #e0e0e0;border-radius:8px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.03);transition:box-shadow .2s}
+.sbu .sbu-bk:hover{box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.sbu .sbu-bk-head{padding:16px 20px;background:linear-gradient(135deg,#fafbfc 0%,#f6f7f7 100%)}
+.sbu .sbu-bk-row1{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.sbu .sbu-bk-date{font-size:15px;font-weight:600;color:#1d2327;white-space:nowrap}
+.sbu .sbu-bk-meta{font-size:12px;color:#646970;white-space:nowrap}
+.sbu .sbu-bk-row2{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.sbu .sbu-bk-row3{display:flex;align-items:center;gap:8px}
+.sbu .sbu-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.sbu .sbu-badge-db{background:#fef3c7;color:#92400e}
+.sbu .sbu-badge-plugins{background:#dbeafe;color:#1e40af}
+.sbu .sbu-badge-themes{background:#ede9fe;color:#5b21b6}
+.sbu .sbu-badge-uploads{background:#d1fae5;color:#065f46}
+.sbu .sbu-badge-others{background:#f3f4f6;color:#374151}
+.sbu .sbu-verify{display:inline-block;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;margin-left:auto;cursor:help;white-space:nowrap}
+.sbu .sbu-verify-ok{background:#d4edda;color:#155724}
+.sbu .sbu-verify-err{background:#f8d7da;color:#721c24}
+.sbu .sbu-toggle{font-size:12px;text-decoration:none;white-space:nowrap;color:#2271b1}
+.sbu .sbu-toggle:hover{color:#135e96}
+.sbu .sbu-bk-files{border-top:1px solid #eee;padding:12px 20px;background:#fff}
+.sbu .sbu-bk-file{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:12px}
+.sbu .sbu-bk-file:last-child{border-bottom:none}
+.sbu .sbu-bk-fn{flex:1;color:#50575e;word-break:break-all;font-family:ui-monospace,monospace;font-size:11px}
+.sbu .sbu-bk-fs{color:#8c8f94;white-space:nowrap;min-width:65px;text-align:right;font-weight:500}
+
+/* Buttons */
+.sbu .button-small{font-size:12px!important;padding:2px 10px!important;border-radius:4px!important}
+.sbu .btn-restore{background:#2271b1!important;color:#fff!important;border-color:#2271b1!important}
+.sbu .btn-restore:hover{background:#135e96!important}
+.sbu .btn-delete{color:#b32d2e!important;border-color:#b32d2e!important}
+.sbu .btn-delete:hover{background:#b32d2e!important;color:#fff!important}
+
+/* Progress Bar */
+.sbu .sbu-progress{margin-top:10px;display:none}
+.sbu .sbu-progress-bar{height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden}
+.sbu .sbu-progress-fill{height:100%;background:linear-gradient(90deg,#2271b1,#72aee6);border-radius:3px;transition:width .3s;width:0}
+.sbu .sbu-progress.indeterminate .sbu-progress-fill{width:30%;animation:sbu-slide 1.2s ease-in-out infinite}
+@keyframes sbu-slide{0%{margin-left:0}50%{margin-left:70%}100%{margin-left:0}}
+
+/* Activity Log */
+.sbu .sbu-al{background:#1a1d21;color:#d4d4d4;padding:18px 20px;border-radius:6px;max-height:400px;overflow:auto;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:11px;line-height:1.9;white-space:pre-wrap;word-break:break-all}
+.sbu .sbu-al .g{color:#73c991}
+.sbu .sbu-al .e{color:#f48771}
+.sbu .sbu-al .b{color:#7dc4e4}
+.sbu .sbu-al .del{color:#e8ab6b}
+.sbu .sbu-al .res{color:#b4a0ff}
+.sbu .sbu-al .dim{color:#6a737d}
+.sbu .log-acts{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+.sbu .sbu-log-filter-label{font-size:12px;color:#50575e}
+.sbu .sbu-log-filter{font-size:12px;padding:2px 6px;height:26px}
+.sbu .log-empty{color:#646970;font-style:italic;padding:12px 0}
+
+/* Upload Progress Banner */
+.sbu .sbu-up-banner{background:linear-gradient(135deg,#f0f6fc 0%,#e8f0fe 100%);border:1px solid #72aee6;border-radius:6px;padding:14px 18px;margin-bottom:16px;display:none}
+.sbu .sbu-up-banner .sbu-up-title{font-weight:600;font-size:13px;color:#1d2327;margin-bottom:6px}
+.sbu .sbu-up-banner .sbu-up-file{font-size:12px;color:#50575e;font-family:ui-monospace,monospace;margin-bottom:8px;word-break:break-all}
+.sbu .sbu-up-bar{height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden}
+.sbu .sbu-up-fill{height:100%;background:linear-gradient(90deg,#2271b1,#72aee6);border-radius:4px;transition:width .5s;width:0}
+.sbu .sbu-up-pct{font-size:11px;color:#646970;margin-top:4px;text-align:right}
+
+/* Mobile responsive */
+@media(max-width:782px){
+.sbu{margin-left:0;margin-right:0;max-width:100%!important;min-width:0}
+.sbu .card,.sbu .sbu-info,.sbu .sbu-bk,.sbu .sbu-up-banner{max-width:100%;overflow-wrap:break-word;word-wrap:break-word}
+.sbu .card{padding:16px 14px}
+.sbu .sbu-info{padding:14px}
+.sbu .sbu-bk-head{padding:12px 14px}
+.sbu .sbu-bk-files{padding:10px 14px}
+.sbu .ff input[type=text],.sbu .ff input[type=url],.sbu .ff input[type=email],.sbu .ff input[type=password],.sbu .ff input[type=number],.sbu .ff select{max-width:100%}
+.sbu .ff label{overflow-wrap:break-word;word-wrap:break-word}
+.sbu .ff .hint{overflow-wrap:break-word;word-wrap:break-word}
+.sbu .sbu-picker{flex-wrap:wrap}
+.sbu .sbu-picker select{max-width:100%;min-width:0;flex-basis:100%}
+.sbu .sbu-newdir{flex-wrap:wrap}
+.sbu .sbu-newdir input{max-width:100%;flex-basis:100%}
+.sbu .acts{flex-wrap:wrap}
+.sbu .acts .button{white-space:normal;text-align:center}
+.sbu .sbu-bk-row3{flex-wrap:wrap}
+.sbu .sbu-bk-row3 .button{white-space:normal}
+.sbu .row{flex-wrap:wrap}
+.sbu .lg,.sbu .sbu-al{padding:12px;font-size:10px}
+.sbu .sbu-up-banner{padding:14px}
+}

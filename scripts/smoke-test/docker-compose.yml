@@ -1,0 +1,109 @@
+# End-to-End smoke-test stack:
+# - WordPress 6.x + MariaDB
+# - Seafile CE 11.x + MariaDB + Memcached
+# Plugin source is mounted read-only from the repo root into the WP plugins dir.
+# run.sh orchestrates setup, fixture upload, and verification.
+
+services:
+  wp-db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: wordpress
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - wp-db-data:/var/lib/mysql
+
+  wordpress:
+    image: wordpress:6.4-php8.2-apache
+    depends_on:
+      wp-db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: wp-db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DEBUG: "1"
+    ports:
+      - "8080:80"
+    volumes:
+      - wp-data:/var/www/html
+      - ../..:/var/www/html/wp-content/plugins/seafile-updraft-backup-uploader:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSf http://localhost/wp-admin/install.php >/dev/null || curl -sSf http://localhost/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  # Long-running wp-cli sidecar. Shares the WP volume, used by run.sh via
+  # `docker compose exec wp-cli ...`. Stays up so we don't pay image-pull
+  # cost on every call.
+  wp-cli:
+    image: wordpress:cli-php8.2
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    user: "33:33"
+    entrypoint: /bin/sh
+    command: ["-c", "sleep infinity"]
+    volumes:
+      - wp-data:/var/www/html
+      - ../..:/var/www/html/wp-content/plugins/seafile-updraft-backup-uploader:ro
+      - ./fixtures:/fixtures:ro
+      - ./helpers:/helpers:ro
+
+  sf-db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: seafile
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - sf-db-data:/var/lib/mysql
+
+  sf-memcached:
+    image: memcached:1.6
+    entrypoint: ["memcached", "-m", "256"]
+
+  seafile:
+    image: seafileltd/seafile-mc:11.0.13
+    depends_on:
+      sf-db:
+        condition: service_healthy
+      sf-memcached:
+        condition: service_started
+    environment:
+      DB_HOST: sf-db
+      DB_ROOT_PASSWD: seafile
+      TIME_ZONE: Europe/Vienna
+      SEAFILE_ADMIN_EMAIL: admin@example.com
+      SEAFILE_ADMIN_PASSWORD: SeafileAdmin123!
+      SEAFILE_SERVER_LETSENCRYPT: "false"
+      SEAFILE_SERVER_HOSTNAME: seafile
+    ports:
+      - "8082:80"
+    volumes:
+      - sf-data:/shared
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSf http://localhost/api2/ping/ | grep -q pong"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+
+volumes:
+  wp-db-data:
+  wp-data:
+  sf-db-data:
+  sf-data:
