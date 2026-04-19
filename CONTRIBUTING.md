@@ -106,7 +106,8 @@ verify manually:
       `always` and fire for the right cases.
 - [ ] Dashboard widget displays the latest status.
 - [ ] Backup list loads and renders type badges.
-- [ ] Download from Seafile works (one-file restore and full restore).
+- [ ] Full restore from Seafile works (the only restore path; single-file
+      downloads were removed in 1.0.6).
 - [ ] Delete on Seafile works.
 - [ ] Plugin uninstall removes all options.
 

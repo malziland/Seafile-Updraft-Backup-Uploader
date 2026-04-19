@@ -78,7 +78,6 @@
     function refreshLog(){P('sbu_get_log').then(function(d){if(d.success){var el=document.getElementById('alc');if(el){el.innerHTML=d.data||'<span class="dim">'+sbuAdmin.i18n.noActivity+'</span>';applyLogFilter();}}}).catch(function(){});}
 
     window.sA=function(a,b){var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent=wait;if(b)b.disabled=true;showProgress(true);var extra=(a==='sbu_test')?getFormCreds()+'&sbu_lib='+encodeURIComponent(libSelect.value)+'&sbu_folder='+encodeURIComponent(folderSelect.value):'';P(a,extra).then(function(d){hideProgress();e.className=d.success?'ok':'er';e.innerHTML='<pre style="margin:0;white-space:pre-wrap;font-size:13px">'+(d.data||'')+'</pre>';if(b)b.disabled=false;if(a==='sbu_upload'){document.getElementById('sbu-upb').style.display='none';stallCount=0;loadBL(true);refreshLog();}if(a==='sbu_test'){loadBL(true);refreshLog();}}).catch(function(x){hideProgress();e.className='er';e.textContent=x.message||'Verbindungsfehler';if(b)b.disabled=false;if(a==='sbu_upload'){document.getElementById('sbu-upb').style.display='none';stallCount=0;}});};
-    window.sDl=function(dir,f){if(!confirm(f))return;var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent='Download...';showProgress(true);P('sbu_download','&dir='+encodeURIComponent(dir)+'&file='+encodeURIComponent(f)).then(function(d){hideProgress();e.className=d.success?'ok':'er';e.textContent=d.data||'';refreshLog();}).catch(function(x){hideProgress();e.className='er';e.textContent=x.message;});};
     window.sDe=function(dir){if(!confirm(dir+'?'))return;var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent='...';P('sbu_delete','&dir='+encodeURIComponent(dir)).then(function(d){e.className=d.success?'ok':'er';e.textContent=d.data||'';if(d.success){loadBL(true);refreshLog();}});};
     window.sbuToggle=function(id,link){var el=document.getElementById(id);if(!el)return;var show=el.style.display==='none';el.style.display=show?'block':'none';link.textContent=show?sbuAdmin.i18n.hide:sbuAdmin.i18n.show;};
     window.sDlAll=function(dir){if(!confirm(sbuAdmin.i18n.restoreConfirm))return;var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent=sbuAdmin.i18n.downloadingAll;showProgress(true);P('sbu_download_all','&dir='+encodeURIComponent(dir)).then(function(d){hideProgress();if(d.success){e.className='ok';e.innerHTML='<pre style="margin:0;white-space:pre-wrap;font-size:13px">'+(d.data||'')+'</pre>';}else{e.className='ld';e.innerHTML='<pre style="margin:0;white-space:pre-wrap;font-size:13px">'+(d.data||'')+'\n\n'+sbuAdmin.i18n.downloadProgress+'</pre>';}refreshLog();}).catch(function(x){hideProgress();e.className='ld';e.textContent=sbuAdmin.i18n.downloadTimeout;});};
@@ -112,8 +111,7 @@
         'clear-log':              function(){ window.sbuClearLog(); },
         'toggle-files':           function(btn){ window.sbuToggle(btn.getAttribute('data-target'), btn); },
         'restore-all':            function(btn){ window.sDlAll(btn.getAttribute('data-dir')); },
-        'delete-backup':          function(btn){ window.sDe(btn.getAttribute('data-dir')); },
-        'download-file':          function(btn){ window.sDl(btn.getAttribute('data-dir'), btn.getAttribute('data-file')); }
+        'delete-backup':          function(btn){ window.sDe(btn.getAttribute('data-dir')); }
     };
     var sbuRoot = document.querySelector('.wrap.sbu') || document;
     sbuRoot.addEventListener('click', function(e){

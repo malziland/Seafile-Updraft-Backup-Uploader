@@ -6,9 +6,9 @@
 
 msgid ""
 msgstr ""
-"Project-Id-Version: Seafile Updraft Backup Uploader 1.5.2\n"
+"Project-Id-Version: Seafile Updraft Backup Uploader 1.0.6\n"
 "Report-Msgid-Bugs-To: info@malziland.at\n"
-"POT-Creation-Date: 2026-04-18 18:41+0200\n"
+"POT-Creation-Date: 2026-04-19 13:57+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: malziland <info@malziland.at>\n"
 "Language-Team: malziland <info@malziland.at>\n"
@@ -23,760 +23,317 @@ msgid ""
 "sicheren Passwortspeicherung."
 msgstr ""
 
-#: includes/class-sbu-crypto.php:84
+#: includes/class-sbu-crypto.php:86
 msgid "Seafile-Passwort auf AES-256-CBC mit zufälligem IV migriert."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:168
+#: includes/class-sbu-plugin.php:291
 msgid "Bitte warten..."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:169 includes/class-sbu-plugin.php:818
-#: views/admin-page.php:216
+#: includes/class-sbu-plugin.php:292 views/admin-page.php:275
 msgid "Noch keine Aktivität aufgezeichnet."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:170
+#: includes/class-sbu-plugin.php:293
 msgid "Hide"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:171
+#: includes/class-sbu-plugin.php:294
 msgid "Show"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:172
+#: includes/class-sbu-plugin.php:295
 msgid ""
 "Alle Backup-Dateien von Seafile auf den Server herunterladen (ins "
 "UpdraftPlus-Verzeichnis). Danach kann über UpdraftPlus wiederhergestellt "
 "werden. Fortfahren?"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:173
+#: includes/class-sbu-plugin.php:296
 msgid "Alle Dateien werden von Seafile heruntergeladen..."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:174
+#: includes/class-sbu-plugin.php:297
 msgid ""
 "Fortschritt wird unten angezeigt, falls der Download im Hintergrund "
 "weiterläuft."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:175
+#: includes/class-sbu-plugin.php:298
 msgid ""
 "Server-Timeout – der Download läuft möglicherweise im Hintergrund weiter. "
 "Bitte Fortschritt unten beobachten."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:176
+#: includes/class-sbu-plugin.php:299
 msgid "Gesamtes Aktivitätsprotokoll leeren?"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:188
+#: includes/class-sbu-plugin.php:300
+msgid ""
+"Neuen externen Cron-Schlüssel generieren? Laufende externe Cronjobs mit dem "
+"alten Schlüssel werden bis zum Crontab-Update nicht mehr akzeptiert."
+msgstr ""
+
+#: includes/class-sbu-plugin.php:301
+msgid "✓ Schlüssel rotiert. Crontab aktualisieren."
+msgstr ""
+
+#: includes/class-sbu-plugin.php:314
 msgid "Access denied."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:237
+#: includes/class-sbu-plugin.php:376
 msgid "Noch kein Backup hochgeladen."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:238
+#: includes/class-sbu-plugin.php:377
 msgid "Einstellungen"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:244 includes/class-sbu-plugin.php:3546
+#: includes/class-sbu-plugin.php:383
 msgid "Erfolgreich"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:244
+#: includes/class-sbu-plugin.php:383
 msgid "Fehlgeschlagen"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:250
+#: includes/class-sbu-plugin.php:389
 msgid "Dateien:"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:251
+#: includes/class-sbu-plugin.php:390
 msgid "Größe:"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:253
+#: includes/class-sbu-plugin.php:392
 msgid "Fehler:"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:255
+#: includes/class-sbu-plugin.php:394
 msgid "Target:"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:257
+#: includes/class-sbu-plugin.php:396
 msgid "Folder:"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:260
+#: includes/class-sbu-plugin.php:399
 msgid "Details"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:271 includes/class-sbu-plugin.php:1666
+#: includes/class-sbu-plugin.php:411
 msgid "Zugriff verweigert."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:273
+#: includes/class-sbu-plugin.php:415
 msgid "Sicherheitsprüfung fehlgeschlagen. Bitte Seite neu laden."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:294
-#, php-format
-msgid "Formular (Länge: %d)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:299
-#, php-format
-msgid "Datenbank (verschlüsselt: %1$d Bytes, entschlüsselt: %2$d Zeichen)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:307
-#, php-format
-msgid ""
-"Authentifizierung fehlgeschlagen: %1$s\n"
-"Passwort-Quelle: %2$s"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:310
-#, php-format
-msgid "✓ Authentifizierung erfolgreich (%s)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:316
-#, php-format
-msgid "✗ Bibliothek: %s"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:319
-#, php-format
-msgid "✓ Bibliothek '%s' gefunden"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:324
-#, php-format
-msgid "✗ Upload-Link: %s"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:326
-msgid "✓ Upload-Link erhalten"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:330
-msgid "Verbindung erfolgreich!"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:331
-msgid "unbegrenzt"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:333
-#, php-format
-msgid "  Chunk: %1$d MB | Aufbewahrung: %2$s"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:336
-#, php-format
-msgid "  Ziel: %s/YYYY-MM-DD_HHMM/"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:350
-msgid "  ✓ Einstellungen gespeichert"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:352
-msgid "Verbindungstest erfolgreich"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:367 includes/class-sbu-plugin.php:669
-msgid "Ein Upload oder Download läuft bereits. Bitte warten oder abbrechen."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:400
-msgid "Vorgang manuell abgebrochen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:414
-msgid "Kein laufender Vorgang zum Pausieren gefunden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:435
-#, php-format
-msgid "Upload pausiert: %1$s bei %2$s"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:441 includes/class-sbu-plugin.php:2053
-msgid "Upload pausiert"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:458
-msgid "Kein pausierter Vorgang gefunden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:477
-#, php-format
-msgid "Upload fortgesetzt: %1$s ab %2$s"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:483
-msgid "Upload fortgesetzt"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:510
-msgid "Authentifizierung fehlgeschlagen."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:512
-msgid "Bibliothek nicht gefunden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:521 includes/class-sbu-plugin.php:1561
-msgid "Verzeichnis nicht lesbar."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:528
-msgid "Keine Backups auf Seafile gefunden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:562
-msgid "Andere"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:573
-msgid "Dateien"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:579
-msgid "Bit-für-bit"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:580
-msgid "Vollständig"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:581
-msgid "Geprüft"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:589 includes/class-sbu-plugin.php:592
-msgid "Unvollständig"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:592 includes/class-sbu-plugin.php:1885
-msgid "Upload läuft…"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:597
-msgid "Dateien anzeigen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:598
-msgid "Wiederherstellen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:599
-msgid "Löschen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:612
-msgid "Download"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:632
-msgid "Ungültige Parameter."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:636 includes/class-sbu-plugin.php:675
-#: includes/class-sbu-plugin.php:765 includes/class-sbu-plugin.php:1555
-#: includes/class-sbu-plugin.php:1584
-msgid "Authentifizierungsfehler."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:638 includes/class-sbu-plugin.php:677
-#: includes/class-sbu-plugin.php:767
-msgid "Bibliotheksfehler."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:642 includes/class-sbu-plugin.php:680
-#: includes/class-sbu-plugin.php:1754
-msgid "UpdraftPlus-Verzeichnis nicht gefunden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:649
-msgid "Einzelne Datei heruntergeladen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:650 includes/class-sbu-plugin.php:717
-msgid "In UpdraftPlus auf \"Lokalen Ordner neu scannen\" klicken."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:664 includes/class-sbu-plugin.php:761
-msgid "Kein Ordner angegeben."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:685
-msgid "Keine Dateien in diesem Backup gefunden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:716
-msgid "Restore übersprungen: alle Dateien bereits lokal vorhanden"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:717
-msgid "Alle Backup-Dateien sind bereits lokal vorhanden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:750
-#, php-format
-msgid ""
-"Wiederherstellung gestartet: %d Dateien werden von Seafile heruntergeladen."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:781
-msgid "Backup manuell gelöscht"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:791
-#, php-format
-msgid "Backup \"%s\" deleted."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:934
-msgid "Ungültiger Schlüssel."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1390
+#: includes/class-sbu-plugin.php:820
 #, php-format
 msgid ""
 "Worker still abgestürzt vor %1$s min — Wiederaufnahme bei %2$s @ %3$s MB"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:1463
+#: includes/class-sbu-plugin.php:893
 #, php-format
 msgid ""
 "Wiederherstellung hängt bei %1$s (%2$s) seit %3$s Stunden. Das Plugin "
 "versucht weiter mit längeren Pausen — es gibt NICHT auf. Bitte Log prüfen."
 msgstr ""
 
-#: includes/class-sbu-plugin.php:1473
+#: includes/class-sbu-plugin.php:903
 #, php-format
 msgid "Stillstand-Meldung per Mail gesendet: %1$s hängt bei %2$s seit %3$sh"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:1516
-msgid "Bitte zuerst URL, Benutzername und Passwort ausfüllen."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1521
-#, php-format
-msgid "Authentifizierung fehlgeschlagen: %s"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1531
-msgid "Ungültige Antwort."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1552
-msgid "Keine Bibliothek angegeben."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1581
-msgid "Parameter fehlen."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1654
-msgid "Einstellungen zurückgesetzt"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1698
-msgid "Vorheriger Vorgang abgebrochen: neues Backup von UpdraftPlus"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1745
-msgid "Zugangsdaten unvollständig"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1747
-msgid "Zugangsdaten unvollständig."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1753
-msgid "UpdraftPlus-Verzeichnis nicht gefunden"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1759
-msgid "Keine Backup-Dateien gefunden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1764
-msgid "Authentifizierung fehlgeschlagen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1771
-msgid "Bibliothek nicht gefunden"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1816
-msgid "Backup bereits vorhanden auf Seafile"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1817
-msgid "Backup bereits vorhanden auf Seafile – Upload übersprungen."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:1935
+#: includes/class-sbu-plugin.php:988
 msgid "Queue fortgesetzt (Admin-Fallback)"
 msgstr ""
 
-#: includes/class-sbu-plugin.php:2006
-msgid "Upload abgebrochen (Abort-Flag)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2023
-msgid "Upload abgebrochen: Auth fehlgeschlagen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2045 includes/class-sbu-plugin.php:2160
-msgid "Upload abgebrochen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2092
-#, php-format
-msgid "SHA1 berechnet: %1$s (%2$s…, %3$ss)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2103
-#, php-format
-msgid ""
-"SHA1 konnte nicht berechnet werden: %s — strikte Prüfung wird für diese "
-"Datei übersprungen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2137
-#, php-format
-msgid ""
-"Upload-Link fehlgeschlagen: %1$s (%2$s) — Versuch %3$d, nächster Versuch in "
-"%4$ds"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2171
-#, php-format
-msgid "Upload pausiert bei %1$s (%2$s)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2213
-#, php-format
-msgid ""
-"%1$s: Fehler bei %2$s nach %3$s MB Chunk in %4$ss (%5$s) — Versuch %6$d, "
-"nächster Versuch in %7$ds"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2237
-#, php-format
-msgid "Langsamer Chunk: %1$s %2$s MB in %3$ss (Timeout: %4$ds)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2332
-#, php-format
-msgid ""
-"Integritätsprüfung übersprungen: %s — Prüfsumme konnte nicht berechnet werden"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2343
-#, php-format
-msgid ""
-"Integritätsfehler: %1$s — erwartet %2$s, tatsächlich %3$s. Datei ist "
-"beschädigt und sollte nicht verwendet werden."
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2368 includes/class-sbu-plugin.php:2488
-#: includes/class-sbu-plugin.php:2608
-msgid "Wiederherstellung abgebrochen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2428
-msgid "Restore abgebrochen: Auth fehlgeschlagen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2443
-#, php-format
-msgid ""
-"Restore-Konfiguration: %1$ds Tick-Budget, %2$d parallele Chunks à %3$d MB"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2527
-#, php-format
-msgid ""
-"Restore %1$s: Download-Link fehlgeschlagen (%2$s) — Versuch %3$d, nächster "
-"Versuch in %4$ds"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2584
-#, php-format
-msgid ""
-"Stream-Download für %1$s fehlgeschlagen (%2$s) nach %3$ss — Fallback auf "
-"Range-Chunks"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2622
-#, php-format
-msgid "Wiederherstellung pausiert bei %1$s (%2$s)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2738
-#, php-format
-msgid "Download-Batch hängt. Sofort-Wiederholung mit frischen Links: %s"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2820
-#, php-format
-msgid "%1$s → %2$s (chunk_mb %3$d→%4$d, parallel %5$d→%6$d, Grund: %7$s)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2909
-#, php-format
-msgid "Restore %s: Zieldatei nicht beschreibbar"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:2950
-#, php-format
-msgid "Langsamer Download-Batch: %1$s %2$s MB in %3$ss"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3004
-#, php-format
-msgid ""
-"Restore %1$s: Teilweise erfolgreich (%2$d/%3$d Chunks committed, Rest: %4$s) "
-"— Fortsetzung in %5$ds"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3051
-#, php-format
-msgid ""
-"Restore %1$s: Fehler bei %2$s nach %3$ss (%4$s) — Versuch %5$d, nächster "
-"Versuch in %6$ds"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3108
-msgid "Backup vollständig wiederhergestellt"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3262
-msgid "hochgeladen"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3262
-msgid "Fehler"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3274
-msgid "Backup komplett"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3276
-msgid "Upload mit Fehlern"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3298
-#, php-format
-msgid "Größe OK: %1$d Dateien (%2$d mit Prüfsumme für Restore)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3305
-msgid "Backup unvollständig"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3358
-msgid "fehlt auf Seafile"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3469
-msgid "Altes Backup konnte nicht gelöscht werden"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3471
-msgid "Altes Backup automatisch gelöscht (Aufbewahrung)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3525
-msgid ""
-"UpdraftPlus-Verlauf bereinigt (lokale Dateien gelöscht, Einträge entfernt)"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3546
-msgid "FEHLER"
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3550
-msgid "Website: "
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3552
-msgid "Details: "
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3553
-msgid "Target:  "
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3554
-msgid "Zeit:    "
-msgstr ""
-
-#: includes/class-sbu-plugin.php:3557
-msgid "Log prüfen: "
-msgstr ""
-
-#: includes/class-sbu-seafile-api.php:97
+#: includes/class-sbu-seafile-api.php:128
 msgid "nicht gefunden. Verfügbar: "
 msgstr ""
 
-#: views/admin-page.php:29
-msgid "☁️ So funktioniert es"
+#: views/admin-page.php:45
+msgid "Wiederherstellung von Seafile abgeschlossen"
 msgstr ""
 
-#: views/admin-page.php:30
+#: views/admin-page.php:46
+msgid "Hinweis schließen"
+msgstr ""
+
+#: views/admin-page.php:52
+#, php-format
 msgid ""
-"Dieses Plugin arbeitet mit <strong>UpdraftPlus</strong>. Nach jedem Backup "
-"werden alle Dateien per Seafile-API mit Chunked Upload hochgeladen. Große "
-"Dateien werden in kleine Teile (z. B. 40 MB) aufgeteilt — kompatibel mit "
-"Cloudflare Tunnels."
+"Backup-Set %1$s wurde am %2$s in den UpdraftPlus-Ordner geladen — %3$d "
+"Dateien, %4$s MB, Dauer ca. %5$d Min."
 msgstr ""
 
-#: views/admin-page.php:32
+#: views/admin-page.php:62
+msgid ""
+"Nächster Schritt: die Dateien liegen jetzt lokal bereit. UpdraftPlus macht "
+"die eigentliche Wiederherstellung ins WordPress-System."
+msgstr ""
+
+#: views/admin-page.php:64
+msgid "In UpdraftPlus öffnen"
+msgstr ""
+
+#: views/admin-page.php:69
+msgid "☁️ So funktioniert das Plugin"
+msgstr ""
+
+#: views/admin-page.php:70
+msgid ""
+"Dieses Plugin arbeitet mit <strong>UpdraftPlus</strong> zusammen und tauscht "
+"den Remote-Speicher gegen eine direkte Seafile-Anbindung aus. Es löst zwei "
+"Richtungen getrennt — weil Upload und Restore <em>völlig unterschiedliche</"
+"em> Anforderungen haben."
+msgstr ""
+
+#: views/admin-page.php:73
+msgid "⬆️ Backup-Upload nach Seafile"
+msgstr ""
+
+#: views/admin-page.php:74
+msgid ""
+"Jede Datei wird in kleine Stücke (z. B. 40 MB) aufgeteilt und einzeln an "
+"Seafile geschickt. Notwendig, weil Reverse-Proxies wie Cloudflare nur 100 MB "
+"pro Upload-Request erlauben. Jedes Stück, das durchgeht, ist gesichert — "
+"fällt eines aus, wird nur dieses eine wiederholt, nicht die ganze Datei."
+msgstr ""
+
+#: views/admin-page.php:77
+msgid "⬇️ Restore-Download von Seafile"
+msgstr ""
+
+#: views/admin-page.php:78
+msgid ""
+"Jede Datei wird zuerst als ganzes Stück geholt — derselbe Weg, den die "
+"Seafile-Weboberfläche nutzt. Klappt das nicht oder ist die Datei zu groß "
+"(über 500 MB), wechselt das Plugin automatisch auf Stücke. Läuft beides "
+"nicht sauber, werden die Pausen länger und du bekommst nach einer Stunde "
+"eine Info-Mail — abgebrochen wird nichts."
+msgstr ""
+
+#: views/admin-page.php:81
+msgid ""
+"<strong>🔒 Integritätsprüfung läuft automatisch:</strong> Beim Upload wird "
+"für jede Backup-Datei eine Prüfsumme berechnet und gespeichert. Beim "
+"Wiederherstellen wird jede heruntergeladene Datei gegen diese Prüfsumme "
+"geprüft — fällt ein Fehler auf, wird die Datei als beschädigt markiert. Das "
+"geschieht ohne zusätzliche Bandbreite."
+msgstr ""
+
+#: views/admin-page.php:83
 msgid "Keine Dateigrößen-Begrenzung — auch Multi-GB-Dateien funktionieren"
 msgstr ""
 
-#: views/admin-page.php:33
-msgid "Cloudflare-Tunnel-kompatibel (Free Tier, 100 MB Limit)"
-msgstr ""
-
-#: views/admin-page.php:34
+#: views/admin-page.php:84
 msgid ""
-"Jeder Chunk wird einzeln hochgeladen — Fehler betreffen nur den einzelnen "
-"Chunk"
+"Reverse-Proxy-kompatibel (Cloudflare Tunnel Free Tier, 100-MB-Upload-Limit)"
 msgstr ""
 
-#: views/admin-page.php:35
+#: views/admin-page.php:85
 msgid ""
-"Integritätsprüfung beim Wiederherstellen (Prüfsumme pro Datei, ohne Extra-"
-"Bandbreite)"
+"Läuft ohne externen Cron und ohne Seiten-Traffic — WordPress-internes "
+"Loopback hält die Queue am Leben"
 msgstr ""
 
-#: views/admin-page.php:36
-msgid "Dashboard-Widget, E-Mail-Alerts, automatische Aufbewahrung"
-msgstr ""
-
-#: views/admin-page.php:37
+#: views/admin-page.php:86
 msgid ""
-"Ein-Klick-Wiederherstellung: von Seafile herunterladen, per UpdraftPlus "
-"wiederherstellen"
+"Dashboard-Widget, E-Mail-Alerts bei Fehler oder Stillstand, automatische "
+"Aufbewahrung"
 msgstr ""
 
-#: views/admin-page.php:39
+#: views/admin-page.php:88
 msgid "Einrichtung:"
 msgstr ""
 
-#: views/admin-page.php:39
+#: views/admin-page.php:88
 msgid ""
 "In UpdraftPlus den Remote-Speicher auf <em>Keine</em> stellen. Dieses Plugin "
 "übernimmt den Upload automatisch."
 msgstr ""
 
-#: views/admin-page.php:45
+#: views/admin-page.php:94
 msgid "Verbindung & Einstellungen"
 msgstr ""
 
-#: views/admin-page.php:49
+#: views/admin-page.php:98
 msgid "Benutzername (E-Mail)"
 msgstr ""
 
-#: views/admin-page.php:53
+#: views/admin-page.php:102
 msgid "Passwort"
 msgstr ""
 
-#: views/admin-page.php:55
+#: views/admin-page.php:104
 msgid "AES-256 verschlüsselt gespeichert. Leer lassen für aktuelles Passwort."
 msgstr ""
 
-#: views/admin-page.php:62
+#: views/admin-page.php:111
 msgid "— Bitte laden —"
 msgstr ""
 
-#: views/admin-page.php:89
+#: views/admin-page.php:138
 msgid "Upload-Chunk-Größe"
 msgstr ""
 
-#: views/admin-page.php:92
+#: views/admin-page.php:141
 msgid "max. 90, empfohlen: 40"
 msgstr ""
 
-#: views/admin-page.php:97
-msgid "Download-Chunk-Größe"
-msgstr ""
-
-#: views/admin-page.php:100
-msgid ""
-"empfohlen: 8. Kleinere Chunks sind über Cloudflare Tunnel deutlich stabiler."
-msgstr ""
-
-#: views/admin-page.php:105
+#: views/admin-page.php:146
 msgid "Aufbewahrung auf Seafile"
 msgstr ""
 
-#: views/admin-page.php:108
+#: views/admin-page.php:149
 msgid "Backups behalten (0 = alle behalten, nie löschen)"
 msgstr ""
 
-#: views/admin-page.php:112
+#: views/admin-page.php:153
 msgid "Benachrichtigungs-E-Mail"
 msgstr ""
 
-#: views/admin-page.php:115
+#: views/admin-page.php:156
 msgid "Benachrichtigungen senden"
 msgstr ""
 
-#: views/admin-page.php:117
+#: views/admin-page.php:158
 msgid "Nur bei Fehlern"
 msgstr ""
 
-#: views/admin-page.php:118
+#: views/admin-page.php:159
 msgid "Nach jedem Backup"
 msgstr ""
 
-#: views/admin-page.php:119
+#: views/admin-page.php:160
 msgid "Nie"
 msgstr ""
 
-#: views/admin-page.php:126
+#: views/admin-page.php:167
 msgid "Automatisch nach UpdraftPlus-Backup hochladen"
 msgstr ""
 
-#: views/admin-page.php:133
+#: views/admin-page.php:174
 msgid "Lokale Dateien nach erfolgreichem Upload löschen"
 msgstr ""
 
-#: views/admin-page.php:135
+#: views/admin-page.php:176
 msgid ""
 "Nur aktivieren, wenn Backups ausschließlich auf Seafile gespeichert werden."
 msgstr ""
 
-#: views/admin-page.php:139
-msgid ""
-"Integritätsprüfung läuft automatisch: Beim Upload wird für jede Backup-Datei "
-"eine Prüfsumme berechnet und gespeichert. Beim Wiederherstellen wird jede "
-"heruntergeladene Datei gegen diese Prüfsumme geprüft — fällt ein Fehler auf, "
-"wird die Datei als beschädigt markiert. Das geschieht ohne zusätzliche "
-"Bandbreite."
-msgstr ""
-
-#: views/admin-page.php:145
+#: views/admin-page.php:182
 msgid "Detailliertes Debug-Log (TICK, BATCH, CHUNK)"
 msgstr ""
 
-#: views/admin-page.php:147
+#: views/admin-page.php:184
 msgid ""
 "Schreibt für jeden Chunk eines Restores eine eigene Zeile ins "
 "Aktivitätsprotokoll (Byte-Range, Dauer, HTTP-Code, cURL-Fehlernummer, "
@@ -784,59 +341,75 @@ msgid ""
 "diagnostizieren ist — das Log füllt sich sonst sehr schnell."
 msgstr ""
 
-#: views/admin-page.php:151
+#: views/admin-page.php:188
+msgid "Aktivitätsprotokoll aufbewahren"
+msgstr ""
+
+#: views/admin-page.php:191
+msgid "Tage (0 = unbegrenzt, empfohlen: 30, min. 7)"
+msgstr ""
+
+#: views/admin-page.php:193
+msgid ""
+"Einträge älter als die angegebene Anzahl Tage werden automatisch einmal "
+"täglich entfernt. Das Log enthält Backup-Dateinamen, Zeitstempel und "
+"Bibliotheksangaben — eine kürzere Aufbewahrung reduziert die gespeicherte "
+"Menge identifizierender Daten."
+msgstr ""
+
+#: views/admin-page.php:197
 msgid "Einstellungen speichern"
 msgstr ""
 
-#: views/admin-page.php:153
+#: views/admin-page.php:199
 msgid "Einstellungen zurücksetzen"
 msgstr ""
 
-#: views/admin-page.php:161
+#: views/admin-page.php:207
 msgid "Aktionen"
 msgstr ""
 
-#: views/admin-page.php:163
+#: views/admin-page.php:209
 msgid "Verbindung testen"
 msgstr ""
 
-#: views/admin-page.php:164
+#: views/admin-page.php:210
 msgid "Backups jetzt hochladen"
 msgstr ""
 
-#: views/admin-page.php:174
+#: views/admin-page.php:220
 msgid "Upload zu Seafile läuft..."
 msgstr ""
 
-#: views/admin-page.php:176
+#: views/admin-page.php:222
 msgid "Pause"
 msgstr ""
 
-#: views/admin-page.php:177
+#: views/admin-page.php:223
 msgid "Fortsetzen"
 msgstr ""
 
-#: views/admin-page.php:178
+#: views/admin-page.php:224
 msgid "Abbrechen"
 msgstr ""
 
-#: views/admin-page.php:187
+#: views/admin-page.php:233
 msgid "Backups auf Seafile"
 msgstr ""
 
-#: views/admin-page.php:188
+#: views/admin-page.php:234
 msgid "Laden..."
 msgstr ""
 
-#: views/admin-page.php:192
+#: views/admin-page.php:238
 msgid "Erweitert: Optionaler externer Heartbeat"
 msgstr ""
 
-#: views/admin-page.php:193
+#: views/admin-page.php:239
 msgid "Nicht nötig — das Plugin läuft komplett unabhängig."
 msgstr ""
 
-#: views/admin-page.php:193
+#: views/admin-page.php:239
 msgid ""
 "Uploads und Restores bleiben ohne jeden externen Trigger in Bewegung: nach "
 "jedem Tick startet ein interner WordPress-Loopback den nächsten, ein "
@@ -847,47 +420,83 @@ msgid ""
 "strong>"
 msgstr ""
 
-#: views/admin-page.php:194
+#: views/admin-page.php:240
 msgid ""
 "Die folgende URL ist nur für den Ausnahmefall dokumentiert, in dem die "
 "Hosting-Umgebung WordPress-Loopbacks komplett blockiert (z. B. Firewall-"
 "Regeln, die die Seite sich selbst nicht aufrufen lassen). In dem Fall kann "
-"ein beliebiger externer Cron diese URL anpingen — der Regelbetrieb benötigt "
-"das nicht."
+"ein beliebiger externer Cron diesen Endpunkt anpingen — der Regelbetrieb "
+"benötigt das nicht."
 msgstr ""
 
-#: views/admin-page.php:196
-msgid "Crontab-Beispiel, alle 2 Minuten:"
+#: views/admin-page.php:242
+msgid "Empfohlen: Schlüssel im Header übergeben"
 msgstr ""
 
-#: views/admin-page.php:201
+#: views/admin-page.php:243
+msgid ""
+"Der Schlüssel landet so nicht in Reverse-Proxy-Logs, Browser-History oder "
+"Shell-History."
+msgstr ""
+
+#: views/admin-page.php:246
+msgid "Legacy: Schlüssel in der URL"
+msgstr ""
+
+#: views/admin-page.php:247
+msgid ""
+"Funktioniert weiter, ist aber nicht empfohlen — der Schlüssel wird in allen "
+"Zwischen-Logs sichtbar."
+msgstr ""
+
+#: views/admin-page.php:250
+msgid "Schlüssel neu generieren"
+msgstr ""
+
+#: views/admin-page.php:251
+msgid ""
+"Ein neuer Schlüssel macht einen laufenden externen Cron bis zum nächsten "
+"Update der Crontab wirkungslos — den Regelbetrieb trifft das nicht."
+msgstr ""
+
+#: views/admin-page.php:255
 msgid "Aktivitätsprotokoll"
 msgstr ""
 
-#: views/admin-page.php:203
+#: views/admin-page.php:258
 msgid "Filter:"
 msgstr ""
 
-#: views/admin-page.php:205
+#: views/admin-page.php:260
 msgid "Alle"
 msgstr ""
 
-#: views/admin-page.php:206
+#: views/admin-page.php:261
 msgid "Nur Fehler"
 msgstr ""
 
-#: views/admin-page.php:207
+#: views/admin-page.php:262
 msgid "Restore-Flow"
 msgstr ""
 
-#: views/admin-page.php:208
+#: views/admin-page.php:263
 msgid "Nur Debug"
 msgstr ""
 
-#: views/admin-page.php:210
+#: views/admin-page.php:267
 msgid "Als Textdatei exportieren"
 msgstr ""
 
-#: views/admin-page.php:211
+#: views/admin-page.php:268
+msgid ""
+"Domain, Bibliotheks-ID und Ordnerpfad werden im Export maskiert — zum Teilen "
+"mit Support, ohne Datenschutz-Bedenken."
+msgstr ""
+
+#: views/admin-page.php:268
+msgid "Anonymisiert exportieren"
+msgstr ""
+
+#: views/admin-page.php:269
 msgid "Log leeren"
 msgstr ""

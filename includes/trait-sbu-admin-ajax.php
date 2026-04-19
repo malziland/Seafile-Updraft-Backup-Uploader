@@ -454,7 +454,6 @@ trait SBU_Admin_Ajax {
 					$h .= '<div class="sbu-bk-file">';
 					$h .= '<span class="sbu-bk-fn">' . $fn . '</span>';
 					$h .= '<span class="sbu-bk-fs">' . $fm . ' MB</span>';
-					$h .= '<button class="button button-small" data-sbu-action="download-file" data-dir="' . esc_attr( $dn ) . '" data-file="' . esc_attr( $f['name'] ) . '">' . __( 'Download', 'seafile-updraft-backup-uploader' ) . '</button>';
 					$h .= '</div>';
 				}
 			}
@@ -462,48 +461,6 @@ trait SBU_Admin_Ajax {
 		}
 
 		wp_send_json_success( $h );
-	}
-
-	/**
-	 * AJAX: Download a single file from Seafile to the UpdraftPlus directory.
-	 *
-	 * @return void Sends JSON response.
-	 */
-	public function ajax_download() {
-		$this->verify_ajax_request();
-		@set_time_limit( 600 );
-		$dir = $this->sanitize_path_segment( isset( $_POST['dir'] ) ? wp_unslash( $_POST['dir'] ) : '' );
-		$fn  = $this->sanitize_path_segment( isset( $_POST['file'] ) ? wp_unslash( $_POST['file'] ) : '' );
-		if ( ! $dir || ! $fn ) {
-			wp_send_json_error( __( 'Ungültige Parameter.', 'seafile-updraft-backup-uploader' ) );
-		}
-
-		$s  = $this->get_settings();
-		$pw = SBU_Crypto::decrypt( $s['pass'] );
-		$t  = SBU_Seafile_API::get_token( $s['url'], $s['user'], $pw );
-		if ( is_wp_error( $t ) ) {
-			wp_send_json_error( __( 'Authentifizierungsfehler.', 'seafile-updraft-backup-uploader' ) );
-		}
-		$r = SBU_Seafile_API::find_library( $s['url'], $t, $s['lib'] );
-		if ( is_wp_error( $r ) ) {
-			wp_send_json_error( __( 'Bibliotheksfehler.', 'seafile-updraft-backup-uploader' ) );
-		}
-
-		$path = rtrim( $s['folder'], '/' ) . '/' . $dir . '/' . $fn;
-		$ud   = $this->get_updraft_dir();
-		if ( ! $ud ) {
-			wp_send_json_error( __( 'UpdraftPlus-Verzeichnis nicht gefunden.', 'seafile-updraft-backup-uploader' ) );
-		}
-
-		$dest   = $ud . '/' . $fn;
-		$result = SBU_Seafile_API::download_file( $s['url'], $t, $r, $path, $dest );
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( $result->get_error_message() );
-		}
-
-		$mb = round( filesize( $dest ) / 1024 / 1024, 1 );
-		$this->activity_logger->log( 'RESTORE', __( 'Einzelne Datei heruntergeladen', 'seafile-updraft-backup-uploader' ) . ": {$fn} ({$mb} MB) ← {$dir}" );
-		wp_send_json_success( $fn . " ({$mb} MB)\n\n" . __( 'In UpdraftPlus auf "Lokalen Ordner neu scannen" klicken.', 'seafile-updraft-backup-uploader' ) );
 	}
 
 	/**

@@ -4,7 +4,7 @@ Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.2
-Stable tag: 1.0.5
+Stable tag: 1.0.6
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -100,6 +100,10 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 
 == Changelog ==
 
+= 1.0.6 =
+* **UI-Aufräumen:** Einzeldatei-Download aus dem „Dateien anzeigen"-Panel entfernt. Grund: der Button hieß „Download", kopierte aber serverseitig ins UpdraftPlus-Verzeichnis statt in den Browser — und zeigte die Erfolgsmeldung in einem Statusfeld außerhalb des Sichtbereichs, was den „nichts passiert"-Eindruck erzeugte. Der Knopf war zudem ohne Nutzen: UpdraftPlus-Chunks (`uploads7.zip`, `uploads14.zip`, …) sind semantisch undurchsichtig, und der **Wiederherstellen**-Button zieht fehlende Dateien über „Teilweise lokal" bereits gezielt nach. Für forensische Einzeldatei-Inspektion ist die Seafile-Weboberfläche der direktere Weg.
+* **Aufgeräumt:** Zusätzlich zum UI-Element sind `SBU_Plugin::ajax_download()`, die JS-Funktion `sDl` (mit Confirm-Dialog, der nur den rohen Dateinamen zeigte), der `download-file`-Event-Delegation-Eintrag und die jetzt tote `SBU_Seafile_API::download_file()`-Methode samt `DEFAULT_DOWNLOAD_CHUNK`-Konstante entfernt. Reine Reduktion — Verhalten der Upload-, Restore- und Löschfunktionen bleibt identisch.
+
 = 1.0.5 =
 * **Breaking:** PHP-Mindestanforderung von 7.4 auf **8.2** angehoben. Composer-Constraint und Plugin-Header gleichzeitig aktualisiert — WordPress blockiert die Aktivierung auf älteren PHP-Versionen. Die unterstützte Matrix ist jetzt PHP 8.2 / 8.3 / 8.4 (CI-getestet).
 * **Testsuite:** PHPUnit 9 → 11. Alle Test-Dateien von `@covers`-Docblocks auf PHP-8-Attribute (`#[CoversClass]` / `#[CoversMethod]`) migriert — null Deprecations mehr. Neue Tests für `SBU_Seafile_API` (17 HTTP-gemockte Fälle: Token-Cache, Library-Resolve, Upload-/Download-Link, Directory-Ops) und für den Log-Export-Sanitizer (12 Fälle: Host-, UUID-, Ordner-, E-Mail-, IP-, Nonce-Maskierung). Gesamt: **121 Tests / 333 Assertions** (vorher 92 / 263).
@@ -121,6 +125,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.6 =
+UI-Bereinigung: Einzeldatei-Download entfernt. Der Button hatte einen verwirrenden „nichts passiert"-Eindruck ausgelöst (Datei landete im `wp-content/updraft/`-Ordner, Erfolgsmeldung lag außerhalb des Sichtfelds) und bot keinen klaren Mehrwert gegenüber „Wiederherstellen" oder der Seafile-Weboberfläche. Keine Migration nötig.
 
 = 1.0.5 =
 Breaking: PHP-Mindestanforderung 8.2. Auf älteren PHP-Versionen verweigert WordPress die Aktivierung. Vor dem Update die PHP-Version des Hosts prüfen. Danach keine manuelle Migration nötig. Intern: PHPUnit 11, erweiterte Testsuite (121 Tests / 333 Assertions), professionalisierte Dokumentation.

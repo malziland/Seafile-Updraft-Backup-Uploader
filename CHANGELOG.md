@@ -4,6 +4,37 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.6] — 2026-04-19
+
+UI-Aufräumen: Einzeldatei-Download aus der Backup-Liste entfernt. Kein Feature-Verlust, nur weniger Verwirrung.
+
+### Entfernt
+
+- **Einzeldatei-Download-Button im „Dateien anzeigen"-Panel.** Der Knopf hieß „Download", triggerte aber **keinen** Browser-Download: `SBU_Plugin::ajax_download()` lud die Datei serverseitig von Seafile in den lokalen UpdraftPlus-Ordner und schrieb die Erfolgsmeldung in das gemeinsam genutzte `#sr`-Statusfeld. Das Feld liegt zwei Panels höher — bei gescrollter Seite außerhalb des Sichtbereichs, weshalb der Pfad sich wie „nichts passiert" anfühlte. Zusätzlich fragte der vorgelagerte `confirm(f)`-Dialog nur den rohen Dateinamen ab (z. B. `backup_2026-04-17-1630_INTERIORISTA_1d2b1dcea52d-db.gz`) ohne zu erklären, was die Bestätigung auslöst.
+- **Rationale für die Entfernung statt Umbau zum Browser-Download:**
+  - **Kein Use-Case:** UpdraftPlus erzeugt die Backup-Sets als nummerierte Chunks (`uploads7.zip`, `uploads14.zip`, …) ohne semantische Bedeutung der Chunk-Nummer. Eine einzelne Datei aus dem Set ist für den Nutzer blind — ohne das vollständige Set ist sie nicht restore-fähig.
+  - **„Wiederherstellen" deckt den Restore-Fall ab:** Der bestehende Restore-Pfad nutzt bereits die „Teilweise lokal"-Erkennung und zieht genau die fehlenden Dateien nach. Das ist der gezielte Re-Download, den ein Einzeldatei-Button theoretisch bieten könnte.
+  - **Seafile-Weboberfläche deckt den Inspektions-Fall ab:** Wer eine einzelne `.gz` außerhalb von WordPress untersuchen will, lädt sie direkt aus der Seafile-Weboberfläche — ein Plugin-Umweg bringt dort keinen Mehrwert.
+  - **Jeder Button, der nicht verstanden wird, ist eine Support-Quelle.** Die aktuelle Plugin-Zielgruppe (self-hoster, der UpdraftPlus + Seafile koppelt) klickt ihn in der Praxis versehentlich und wundert sich.
+
+### Aufgeräumt (tote Code-Pfade)
+
+- **`SBU_Plugin::ajax_download()`** — Handler vollständig entfernt (inkl. der `'Einzelne Datei heruntergeladen: …'`- und `'Ungültige Parameter.'`-Strings, die nur hier vorkamen).
+- **`'download'` aus der AJAX-Hook-Registrierung in `SBU_Plugin::boot_plugin()`** — damit ist die `wp_ajax_sbu_download`-Route weg. Wer die Route manuell aufruft, bekommt jetzt WordPress' Standard-0-Response.
+- **`SBU_Seafile_API::download_file()`** — die nur von `ajax_download()` aufgerufene Methode (Range-Chunk-Download mit Link-Refresh-Retry) ist jetzt tot und wurde entfernt. Sie überschnitt sich funktional mit dem aktiven Restore-Pfad aus `SBU_Seafile_API::download_whole_file_stream()` + `download_chunks_parallel()`, die der Restore-Flow nutzt — die bleiben unverändert.
+- **`SBU_Seafile_API::DEFAULT_DOWNLOAD_CHUNK`-Konstante** — nur von `download_file()` referenziert, mit der Methode entfernt. Die im Restore-Flow aktive Standard-Chunk-Größe steckt in `SBU_DOWNLOAD_CHUNK_MB_DEFAULT` (20 MB) und bleibt so wie sie war.
+- **`window.sDl`** und **`'download-file'` im Event-Delegation-Map** in `assets/js/admin.js` — entfernt.
+- **`<button data-sbu-action="download-file">` im „Dateien anzeigen"-Panel** in `SBU_Plugin::ajax_list()` — entfernt. Das Panel zeigt jetzt nur noch Dateiname und Größe pro Zeile, reine Inhaltsliste ohne Aktionen.
+
+### Geändert
+
+- **Übersetzungsvorlage (`languages/seafile-updraft-backup-uploader.pot`)** — neu generiert. Die Strings des entfernten Pfads sind nicht mehr Teil der Vorlage. Die Regeneration hat zusätzlich die alte Version-Referenz (aus einem früheren Versionszweig) auf den aktuellen Stand gezogen.
+- **Dokumentation** — `README.md`, `ARCHITECTURE.md` und `CONTRIBUTING.md` auf den neuen Admin-AJAX-Handler-Stand (22 Admin-Endpunkte + 1 öffentlicher Cron-Endpoint) aktualisiert, „one-file restore" aus der Test-Checkliste gestrichen.
+
+### Tests
+
+**121 Tests / 333 Assertions** — unverändert. PHPCS, PHPStan Level 5 und PHPUnit 11 grün auf PHP 8.2 / 8.3 / 8.4.
+
 ## [1.0.5] — 2026-04-19
 
 Breaking-Change-Release: PHP-Mindestanforderung auf 8.2 angehoben. Testsuite auf PHPUnit 11 gehoben und um zwei neue Abdeckungs-Schwerpunkte erweitert. Dokumentation (README, ARCHITECTURE, CONTRIBUTING) auf den aktuellen Code-Stand gezogen.

@@ -131,7 +131,7 @@ final class SBU_Plugin {
 		// Prune nach. Bei leerem Log oder retention=0 ist das ein No-Op
 		// (cron_prune() bricht früh ab), also günstig.
 		add_action( 'admin_init', array( $this->activity_logger, 'cron_prune' ) );
-		foreach ( array( 'test', 'upload', 'list', 'download', 'download_all', 'delete', 'get_log', 'export_log', 'export_log_anon', 'clear_log', 'upload_status', 'load_libs', 'load_dirs', 'create_dir', 'save_settings', 'reset_settings', 'refresh_nonce', 'abort_upload', 'pause_upload', 'resume_upload', 'kick', 'dismiss_restore_banner', 'rotate_cron_key' ) as $a ) {
+		foreach ( array( 'test', 'upload', 'list', 'download_all', 'delete', 'get_log', 'export_log', 'export_log_anon', 'clear_log', 'upload_status', 'load_libs', 'load_dirs', 'create_dir', 'save_settings', 'reset_settings', 'refresh_nonce', 'abort_upload', 'pause_upload', 'resume_upload', 'kick', 'dismiss_restore_banner', 'rotate_cron_key' ) as $a ) {
 			add_action( 'wp_ajax_sbu_' . $a, array( $this, 'ajax_' . $a ) );
 		}
 		// External cron endpoint (no login required, key-protected)

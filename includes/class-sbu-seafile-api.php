@@ -40,10 +40,9 @@
  *
  * The caller is responsible for:
  *   - obtaining credentials and passing them in (see {@see self::get_token()}),
- *   - deciding how long to cache the auth token,
+ *   - deciding how long to cache the auth token, and
  *   - retrying on HTTP 401 after calling `get_token( ..., true )` for a fresh
- *     token, and
- *   - supplying a chunk size for {@see self::download_file()}.
+ *     token.
  *
  * @package seafile-updraft-backup-uploader
  */
@@ -51,13 +50,6 @@
 defined( 'ABSPATH' ) || exit;
 
 final class SBU_Seafile_API {
-
-	/**
-	 * Default chunk size (bytes) for {@see self::download_file()} when the
-	 * caller passes `$chunk_size <= 0`. Matches the plugin's own default of
-	 * 40 MB per chunk.
-	 */
-	const DEFAULT_DOWNLOAD_CHUNK = 20971520; // 20 MB — safe through Cloudflare Tunnel (~100 s connection limit); the plugin runs N of these in parallel via download_chunks_parallel().
 
 	/**
 	 * Obtain an auth token. Returns the cached transient unless `$force` is
@@ -282,207 +274,6 @@ final class SBU_Seafile_API {
 			return new \WP_Error( 'api', 'No download link for ' . basename( $path ) );
 		}
 		return $link;
-	}
-
-	/**
-	 * Stream a file from Seafile to a local path, chunking with HTTP Range
-	 * requests when the remote is larger than the requested chunk size.
-	 * Link re-fetch on HTTP 403 (expired signed URL) is handled internally.
-	 *
-	 * @param string $url        Seafile base URL.
-	 * @param string $token      Auth token.
-	 * @param string $rid        Repo ID.
-	 * @param string $path       Remote file path.
-	 * @param string $dest       Local destination path (will be overwritten).
-	 * @param int    $chunk_size Bytes per Range request. Pass <= 0 to use
-	 *                           {@see self::DEFAULT_DOWNLOAD_CHUNK}.
-	 * @return true|\WP_Error
-	 */
-	public static function download_file( $url, $token, $rid, $path, $dest, $chunk_size = 0 ) {
-		$link = self::get_download_link( $url, $token, $rid, $path );
-		if ( is_wp_error( $link ) ) {
-			return $link;
-		}
-
-		if ( $chunk_size <= 0 ) {
-			$chunk_size = self::DEFAULT_DOWNLOAD_CHUNK;
-		}
-
-		// Get file size via HEAD
-		$head      = wp_remote_head(
-			$link,
-			array(
-				'timeout' => SBU_TIMEOUT_API,
-				'headers' => array( 'Authorization' => 'Token ' . $token ),
-			)
-		);
-		$file_size = 0;
-		if ( ! is_wp_error( $head ) ) {
-			$file_size = (int) wp_remote_retrieve_header( $head, 'content-length' );
-		}
-
-		// Small files or unknown size: download in one go
-		if ( $file_size <= $chunk_size ) {
-			$dl = wp_remote_get(
-				$link,
-				array(
-					'timeout'  => SBU_TIMEOUT_DOWNLOAD,
-					'stream'   => true,
-					'filename' => $dest,
-					'headers'  => array(
-						'Authorization' => 'Token ' . $token,
-						'Connection'    => 'close',
-					),
-				)
-			);
-			if ( is_wp_error( $dl ) ) {
-				@unlink( $dest );
-				return $dl;
-			}
-			$code = wp_remote_retrieve_response_code( $dl );
-			// Refresh link on 403 and retry once
-			if ( $code === 403 ) {
-				@unlink( $dest );
-				$link = self::get_download_link( $url, $token, $rid, $path );
-				if ( is_wp_error( $link ) ) {
-					return $link;
-				}
-				$dl = wp_remote_get(
-					$link,
-					array(
-						'timeout'  => SBU_TIMEOUT_DOWNLOAD,
-						'stream'   => true,
-						'filename' => $dest,
-						'headers'  => array( 'Authorization' => 'Token ' . $token ),
-					)
-				);
-				if ( is_wp_error( $dl ) ) {
-					@unlink( $dest );
-					return $dl;
-				}
-				$code = wp_remote_retrieve_response_code( $dl );
-			}
-			if ( $code !== 200 ) {
-				@unlink( $dest );
-				return new \WP_Error( 'http', 'HTTP ' . $code );
-			}
-			return true;
-		}
-
-		// Large files: chunked download with Range headers
-		@unlink( $dest );
-		$offset   = 0;
-		$link_age = time();
-		while ( $offset < $file_size ) {
-			// Check for abort between chunks
-			wp_cache_delete( 'sbu_abort_flag', 'transient' );
-			wp_cache_delete( '_transient_sbu_abort_flag', 'options' );
-			if ( get_transient( 'sbu_abort_flag' ) ) {
-				@unlink( $dest );
-				return new \WP_Error( 'aborted', 'Download abgebrochen' );
-			}
-
-			// Refresh download link if older than 10 minutes
-			if ( ( time() - $link_age ) > 600 ) {
-				$link = self::get_download_link( $url, $token, $rid, $path );
-				if ( is_wp_error( $link ) ) {
-					@unlink( $dest );
-					return $link;
-				}
-				$link_age = time();
-			}
-
-			$end = min( $offset + $chunk_size - 1, $file_size - 1 );
-			$tmp = $dest . '.part';
-
-			$dl = wp_remote_get(
-				$link,
-				array(
-					'timeout'  => SBU_TIMEOUT_DOWNLOAD,
-					'stream'   => true,
-					'filename' => $tmp,
-					'headers'  => array(
-						'Authorization' => 'Token ' . $token,
-						'Connection'    => 'close',
-						'Range'         => "bytes={$offset}-{$end}",
-					),
-				)
-			);
-
-			if ( is_wp_error( $dl ) ) {
-				@unlink( $tmp );
-				@unlink( $dest );
-				return $dl;
-			}
-
-			$code = wp_remote_retrieve_response_code( $dl );
-
-			// Refresh link on 403 and retry this chunk
-			if ( $code === 403 ) {
-				@unlink( $tmp );
-				$link = self::get_download_link( $url, $token, $rid, $path );
-				if ( is_wp_error( $link ) ) {
-					@unlink( $dest );
-					return $link;
-				}
-				$link_age = time();
-				$dl       = wp_remote_get(
-					$link,
-					array(
-						'timeout'  => SBU_TIMEOUT_DOWNLOAD,
-						'stream'   => true,
-						'filename' => $tmp,
-						'headers'  => array(
-							'Authorization' => 'Token ' . $token,
-							'Range'         => "bytes={$offset}-{$end}",
-						),
-					)
-				);
-				if ( is_wp_error( $dl ) ) {
-					@unlink( $tmp );
-					@unlink( $dest );
-					return $dl;
-				}
-				$code = wp_remote_retrieve_response_code( $dl );
-			}
-
-			if ( $code !== 206 && $code !== 200 ) {
-				@unlink( $tmp );
-				@unlink( $dest );
-				return new \WP_Error( 'http', "HTTP {$code} bei Offset {$offset}" );
-			}
-
-			// Append chunk to destination
-			$fh = fopen( $dest, $offset === 0 ? 'wb' : 'ab' );
-			if ( ! $fh ) {
-				@unlink( $tmp );
-				return new \WP_Error( 'io', 'Cannot open dest' );
-			}
-			$th = fopen( $tmp, 'rb' );
-			if ( $th ) {
-				while ( ! feof( $th ) ) {
-					fwrite( $fh, fread( $th, 65536 ) );
-				}
-				fclose( $th );
-			}
-			fclose( $fh );
-			@unlink( $tmp );
-
-			$written = filesize( $dest );
-			$offset  = $written;
-
-			// If server returned 200 instead of 206, it sent the whole file
-			if ( $code === 200 ) {
-				break;
-			}
-		}
-
-		// Verify final size
-		if ( file_exists( $dest ) && filesize( $dest ) >= $file_size ) {
-			return true;
-		}
-		$actual = file_exists( $dest ) ? filesize( $dest ) : 0;
-		return new \WP_Error( 'incomplete', "Download unvollständig: {$actual}/{$file_size} Bytes" );
 	}
 
 	/**

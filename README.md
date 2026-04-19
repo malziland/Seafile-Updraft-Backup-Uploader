@@ -87,7 +87,7 @@ seafile-updraft-backup-uploader/
 │   ├── class-sbu-crypto.php              — AES-256-CBC Password-Encryption
 │   ├── trait-sbu-upload-flow.php         — Upload-Queue, Chunked-Upload, Retry/Backoff
 │   ├── trait-sbu-restore-flow.php        — Restore-Queue, paralleler Range-Download
-│   └── trait-sbu-admin-ajax.php          — 20 AJAX-Handler (Admin) + 1 öffentlicher Cron-Ping
+│   └── trait-sbu-admin-ajax.php          — 22 AJAX-Handler (Admin) + 1 öffentlicher Cron-Ping
 ├── views/
 │   └── admin-page.php                    — Template der Einstellungsseite
 ├── assets/
@@ -113,7 +113,7 @@ seafile-updraft-backup-uploader/
 - `SBU_Crypto` — AES-256-CBC mit zufälligem IV pro Vorgang. Legacy-IV-Migration erkennt alte Formate und re-verschlüsselt beim nächsten Save.
 - `SBU_Upload_Flow` / `SBU_Restore_Flow` / `SBU_Admin_Ajax_Controller` — Traits, die die Upload-Queue-Mechanik, Restore-Queue-Mechanik und AJAX-Endpunkte in `SBU_Plugin` einhängen.
 
-**Öffentliche Oberfläche:** 20 Admin-AJAX-Endpunkte (alle mit `manage_options` + Nonce) und genau **ein** öffentlicher Endpunkt `sbu_cron_ping` (per-site 32-char Secret-Key, `hash_equals()`-Vergleich).
+**Öffentliche Oberfläche:** 22 Admin-AJAX-Endpunkte (alle mit `manage_options` + Nonce) und genau **ein** öffentlicher Endpunkt `sbu_cron_ping` (per-site 32-char Secret-Key, `hash_equals()`-Vergleich).
 
 Die Queue-Logik, das Locking-Modell und die State-Machine (uploading ↔ paused, → aborted/error/done) sind in [ARCHITECTURE.md](ARCHITECTURE.md) dokumentiert.
 
