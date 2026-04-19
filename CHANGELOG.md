@@ -4,6 +4,32 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.2] — 2026-04-19
+
+Audit-Umsetzung: Datenschutz, Wartbarkeit, CI-Schärfe.
+
+### Hinzugefügt
+
+- **Zeit-basierte Aufbewahrung für das Aktivitätsprotokoll** (Default 30 Tage, konfigurierbar 7–365 Tage oder 0 = deaktiviert). Alte Einträge werden einmal täglich per Cron und opportunistisch beim Schreiben gelöscht. Das bisherige Zeilen-Limit (500 Zeilen) bleibt als zusätzliche Obergrenze erhalten.
+- **Warn-Header im Log-Export** (unmaskierte Variante) weist jetzt unübersehbar darauf hin, dass der Export identifizierende Daten (Host, Bibliothek, Pfade, E-Mail) enthält — für Support-Weitergabe wird „Anonymisiert exportieren" empfohlen.
+- **Neue Einstellung „Aktivitätsprotokoll aufbewahren"** auf der Plugin-Seite mit Laien-Erklärung (Standard-Empfehlung 30 Tage, Hinweis auf DSGVO-Datensparsamkeit).
+- **5 neue Unit-Tests** für die Retention-Logik (alte Einträge werden verworfen, 0 = unverändert durchreichen, unparsebar formatierte Zeilen werden nie verloren, Panik-Eingaben werden auf 7 Tage hochgeklemmt).
+
+### Geändert
+
+- **Inline-`onclick`-Handler aus dem Admin-Template entfernt** — 9 Buttons nutzen jetzt `data-sbu-action`-Attribute, ein zentraler Event-Delegate in `admin.js` routet auf die Funktionen. Erleichtert künftige Wartung und strengere Content-Security-Policies.
+- **CI-Pipeline scharf gestellt** — PHPCS und PHPStan brechen den Build jetzt bei Fehlern ab (vorher mit `|| true` maskiert). PHPStan läuft mit `--memory-limit=2G`, um OOM auf großen Code-Pfaden zu vermeiden.
+- **Ein Code-Review-Durchlauf** mit echten Bugfixes statt nur Rauschen: `wp_unslash()` vor `sanitize_path_segment()` in den Ajax-Download-/Delete-Endpoints, gecachte `count()`-Aufrufe in zwei Schleifen, `translators`-Kommentare für zwei komplexe i18n-Strings, Umbenennung kollidierender Parameter.
+
+### Sicherheit
+
+- **Retention-Clamp gegen Panik-Eingaben** — Werte zwischen 1 und 6 Tagen werden automatisch auf 7 angehoben, damit ein Fehlklick im Admin das Protokoll nicht in einem Tick vollständig leert. 0 bleibt als explizite Deaktivierung erlaubt.
+- **Datenminimierung im Default-Fall** — Aktivitätsprotokoll-Einträge älter als 30 Tage werden ohne weitere Konfiguration entfernt. Unterstützt die DSGVO-Forderung nach Datensparsamkeit.
+
+### Tests
+
+92 PHPUnit-Tests / 263 Assertions, alle grün. PHPCS (WordPress-Standard) und PHPStan (Level 5) sauber.
+
 ## [1.0.1] — 2026-04-18
 
 UI-Politur der Einstellungsseite.

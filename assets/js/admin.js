@@ -95,6 +95,57 @@
     // Clear log
     window.sbuClearLog=function(){if(!confirm(sbuAdmin.i18n.clearLogConfirm))return;P('sbu_clear_log').then(function(d){if(d.success)refreshLog();});};
 
+    // Delegated dispatcher for data-sbu-action buttons. Replaces the inline
+    // onclick="..." handlers from admin-page.php — CSP-safer, and keeps the
+    // view template logic-free. Each key maps to a zero-arg entry point; sA()
+    // callers pass the triggering button as "this" equivalent so the existing
+    // disable/enable flow still works.
+    var sbuActions = {
+        'test':                   function(btn){ window.sA('sbu_test', btn); },
+        'upload':                 function(btn){ window.sA('sbu_upload', btn); },
+        'pause':                  function(){ window.sbuPause(); },
+        'resume':                 function(){ window.sbuResume(); },
+        'abort':                  function(){ window.sbuAbort(); },
+        'dismiss-restore-banner': function(){ window.sbuDismissRestoreBanner(); },
+        'export-log':             function(){ window.sbuExportLog(); },
+        'export-log-anon':        function(){ window.sbuExportLogAnon(); },
+        'clear-log':              function(){ window.sbuClearLog(); }
+    };
+    var sbuRoot = document.querySelector('.wrap.sbu') || document;
+    sbuRoot.addEventListener('click', function(e){
+        var btn = e.target.closest ? e.target.closest('[data-sbu-action]') : null;
+        if (!btn) return;
+        var key = btn.getAttribute('data-sbu-action');
+        var fn  = sbuActions[key];
+        if (fn) { e.preventDefault(); fn(btn); }
+    });
+
+    // Rotate the external cron key. Shown in the "Erweitert" section —
+    // not something most users will touch, but the button lets them
+    // revoke a leaked key without DB access.
+    var rotateBtn = document.getElementById('sbu-rotate-cron-key');
+    if (rotateBtn) {
+        rotateBtn.addEventListener('click', function(){
+            if (!confirm(sbuAdmin.i18n.rotateCronConfirm)) return;
+            var status = document.getElementById('sbu-rotate-cron-status');
+            rotateBtn.disabled = true;
+            if (status) { status.className = 'sbu-picker-status show'; status.textContent = sbuAdmin.i18n.wait; }
+            P('sbu_rotate_cron_key').then(function(d){
+                rotateBtn.disabled = false;
+                if (!d.success) {
+                    if (status) { status.className = 'sbu-picker-status show er'; status.textContent = d.data || 'Fehler'; }
+                    return;
+                }
+                if (status) { status.className = 'sbu-picker-status show ok'; status.textContent = sbuAdmin.i18n.rotateCronOk; }
+                // Reload so the rendered crontab examples pick up the new key.
+                setTimeout(function(){ location.reload(); }, 1200);
+            }).catch(function(x){
+                rotateBtn.disabled = false;
+                if (status) { status.className = 'sbu-picker-status show er'; status.textContent = x.message || 'Verbindungsfehler'; }
+            });
+        });
+    }
+
     function loadBL(silent){var e=document.getElementById('bl');if(!silent)e.innerHTML='<div class="sbu-progress" style="display:block"><div class="sbu-progress-bar"><div class="sbu-progress-fill" style="width:30%;animation:sbu-slide 1.2s ease-in-out infinite"></div></div></div>';P('sbu_list',getFormCreds()).then(function(d){e.innerHTML=d.success?d.data:'<p style="color:#d63638">'+d.data+'</p>';}).catch(function(x){if(!silent)e.innerHTML=x.message;});}
     loadBL();
 

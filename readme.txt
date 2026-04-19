@@ -4,7 +4,7 @@ Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -94,6 +94,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 
 == Changelog ==
 
+= 1.0.2 =
+* Audit-Umsetzung (Datenschutz, Wartbarkeit, CI): Zeit-basierte Aufbewahrung des Aktivitätsprotokolls (Default 30 Tage, 7–365 Tage oder 0 = deaktiviert), Warn-Header im unmaskierten Log-Export, Inline-onclick aus dem Admin entfernt (Event-Delegation via `data-sbu-action`), CI-Gates (PHPCS, PHPStan) brechen den Build jetzt bei Fehlern ab. 92 Tests / 263 Assertions, alle grün.
+
 = 1.0.1 =
 * UI-Politur: Integritätsprüfungs-Hinweis aus dem Einstellungsblock in den Erklär-Bereich „So funktioniert das Plugin" verschoben. Toolbar im Aktivitätsprotokoll sauber in Filter-/Aktions-Gruppen aufgeteilt, mobiltauglich bis < 600 px.
 
@@ -101,6 +104,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.2 =
+Datenschutz-Update: Aktivitätsprotokoll wird automatisch nach 30 Tagen aufgeräumt (konfigurierbar). Log-Export mit Warnhinweis auf identifizierende Daten. Keine Migration nötig.
 
 = 1.0.1 =
 Reine UI-Verbesserung. Kein Migrations-Aufwand.

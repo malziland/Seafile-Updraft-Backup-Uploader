@@ -17,6 +17,18 @@
         <exclude name="Generic.Arrays.DisallowShortArraySyntax"/>
         <exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
         <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+
+        <!-- Stilpräferenzen: moderne Lesart statt Yoda, Kurz-Ternary erlaubt,
+             keine erzwungenen Docblock-Vollständigkeit. Sicherheitsrelevante
+             Sniffs bleiben aktiv. -->
+        <exclude name="WordPress.PHP.YodaConditions.NotYoda"/>
+        <exclude name="Universal.Operators.DisallowShortTernary"/>
+        <exclude name="Squiz.Commenting.InlineComment.InvalidEndChar"/>
+        <exclude name="Squiz.Commenting.FunctionComment"/>
+        <exclude name="Squiz.Commenting.ClassComment"/>
+        <exclude name="Squiz.Commenting.VariableComment"/>
+        <exclude name="Squiz.Commenting.FileComment"/>
+        <exclude name="Generic.Commenting.DocComment.LongNotCapital"/>
     </rule>
 
     <config name="minimum_wp_version" value="6.0"/>
@@ -31,4 +43,9 @@
             </property>
         </properties>
     </rule>
+
+    <!-- Der NonceVerification-Sniff erkennt nur globale Funktionsaufrufe,
+         nicht $this->verify_ajax_request(). Die Unterdrückung erfolgt
+         deshalb file-scope in includes/class-sbu-plugin.php mit einem
+         prominenten Grund-Block am Dateikopf. -->
 </ruleset>

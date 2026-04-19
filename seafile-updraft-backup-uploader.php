@@ -26,7 +26,7 @@
  * Plugin Name: Seafile Updraft Backup Uploader
  * Plugin URI:  https://github.com/malziland/seafile-updraft-backup-uploader
  * Description: Uploads UpdraftPlus backups to Seafile via chunked API upload. Bypasses WebDAV and Cloudflare limits. Dashboard widget, email alerts, retention management.
- * Version:     1.0.1
+ * Version:     1.0.2
  * Author:      malziland - learning | training | consulting
  * Author URI:  https://malziland.at
  * License:     MIT
@@ -40,7 +40,7 @@ defined( 'ABSPATH' ) || exit;
 
 // --- Constants ---------------------------------------------------------------
 
-define( 'SBU_VER', '1.0.1' );
+define( 'SBU_VER', '1.0.2' );
 define( 'SBU_OPT', 'sbu_settings' );
 define( 'SBU_LOG', 'sbu_log' );
 define( 'SBU_STAT', 'sbu_status' );
@@ -60,6 +60,11 @@ define( 'SBU_DOWNLOAD_CHUNK_MB_MIN', 4 );
 define( 'SBU_HASHES', 'sbu_backup_hashes' );
 define( 'SBU_ACTIVITY', 'sbu_activity_log' );
 define( 'SBU_ACTIVITY_MAX', 500 );
+// Zeit-basierte Aufbewahrung des Aktivitätsprotokolls (Tage). Default 30 Tage.
+// Erlaubte Werte: 0 (deaktiviert, nur Zeilen-Cap greift) oder 7..365. Wird per
+// daily-Cron und opportunistisch bei activity_log()-Aufrufen angewendet.
+define( 'SBU_ACTIVITY_RETENTION_DAYS_DEFAULT', 30 );
+define( 'SBU_ACTIVITY_RETENTION_CRON_HOOK', 'sbu_activity_retention_tick' );
 define( 'SBU_QUEUE', 'sbu_upload_queue' );
 define( 'SBU_CRON_HOOK', 'sbu_cron_tick' );
 // Legacy ceiling for the tick budget — the real per-request value is
@@ -80,6 +85,10 @@ define( 'SBU_PARALLEL_DOWNLOADS_MAX', 8 );
 // 2 MB/s assumes a worst-case TLS + proxy path; real-world throughput is
 // usually higher, which just means the timeout is overbudgeted.
 define( 'SBU_RESTORE_THROUGHPUT_BPS', 2 * 1024 * 1024 );
+// Hard upper bound on in-process sleep inside ajax_cron_ping while a
+// backoff gate is active. Prevents a single request from holding a PHP-FPM
+// worker for a full tick window; the loopback-spawn path picks up the rest.
+define( 'SBU_CRON_SLEEP_MAX', 15 );
 
 // --- Class loading -----------------------------------------------------------
 
@@ -93,28 +102,35 @@ new SBU_Plugin();
 
 // --- Activation / Deactivation / Uninstall -----------------------------------
 
-register_activation_hook( __FILE__, function () {
-    if ( false === get_option( SBU_OPT ) ) {
-        add_option( SBU_OPT, [] );
-    }
-} );
+register_activation_hook(
+	__FILE__,
+	function () {
+		if ( false === get_option( SBU_OPT ) ) {
+			add_option( SBU_OPT, array() );
+		}
+	}
+);
 
-register_deactivation_hook( __FILE__, function () {
-    delete_transient( SBU_TOK );
-} );
+register_deactivation_hook(
+	__FILE__,
+	function () {
+		delete_transient( SBU_TOK );
+		wp_clear_scheduled_hook( SBU_ACTIVITY_RETENTION_CRON_HOOK );
+	}
+);
 
 register_uninstall_hook( __FILE__, 'sbu_uninstall' );
 
 function sbu_uninstall() {
-    delete_option( SBU_OPT );
-    delete_option( SBU_LOG );
-    delete_option( SBU_STAT );
-    delete_option( SBU_ACTIVITY );
-    delete_option( SBU_QUEUE );
-    delete_option( SBU_HASHES );
-    delete_option( 'sbu_verified' );
-    delete_option( 'sbu_cron_key' );
-    delete_option( 'sbu_queue_lock' );
-    delete_transient( SBU_TOK );
-    delete_transient( 'sbu_processing_lock' );
+	delete_option( SBU_OPT );
+	delete_option( SBU_LOG );
+	delete_option( SBU_STAT );
+	delete_option( SBU_ACTIVITY );
+	delete_option( SBU_QUEUE );
+	delete_option( SBU_HASHES );
+	delete_option( 'sbu_verified' );
+	delete_option( 'sbu_cron_key' );
+	delete_option( 'sbu_queue_lock' );
+	delete_transient( SBU_TOK );
+	delete_transient( 'sbu_processing_lock' );
 }

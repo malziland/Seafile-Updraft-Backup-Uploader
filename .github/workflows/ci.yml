@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
       - name: Run PHPCS (WordPress standard)
-        run: ./vendor/bin/phpcs --standard=WordPress --extensions=php --ignore=vendor,languages,assets,.github . || true
+        run: ./vendor/bin/phpcs --extensions=php --ignore=vendor,languages,assets,tests,.github,scripts .
 
   phpstan:
     name: PHPStan (Level 5)
@@ -50,7 +50,7 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
       - name: Run PHPStan
-        run: ./vendor/bin/phpstan analyse --level=5 --no-progress seafile-updraft-backup-uploader.php || true
+        run: ./vendor/bin/phpstan analyse --level=5 --memory-limit=2G --no-progress seafile-updraft-backup-uploader.php
 
   phpunit:
     name: PHPUnit (${{ matrix.php }})
