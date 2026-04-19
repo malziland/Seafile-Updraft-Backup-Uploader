@@ -54,9 +54,51 @@ defined( 'ABSPATH' ) || exit;
 final class SBU_Plugin {
 
 	/**
+	 * Activity-log service (ARCH-001 Schritt 1 — aus der God-Class rausgezogen).
+	 *
+	 * Alle schreibenden/lesenden Log-Operationen laufen durch diesen Service.
+	 * SBU_Plugin ruft log()/format()/cron_prune() nur noch als Fassade auf.
+	 * Öffentlich, damit views/admin-page.php direkt auf $this->activity_logger
+	 * zugreifen kann — der Render-Pfad will nicht in ein Getter-Layer gezwungen
+	 * werden, nur um format() aufzurufen.
+	 *
+	 * @var SBU_Activity_Log
+	 */
+	public $activity_logger;
+
+	/**
+	 * Mail-Notifier (ARCH-001 Schritt 2). Zuständig für alle admin-gerichteten
+	 * E-Mails (Erfolg/Fehler/Stillstand). Siehe SBU_Mail_Notifier.
+	 *
+	 * @var SBU_Mail_Notifier
+	 */
+	private $mail_notifier;
+
+	/**
+	 * Queue-Engine (ARCH-001 Schritt 3). Atomares Lock, Gate-Check, Loopback-
+	 * Spawn und WP-Cron-Scheduling. Nutzt Callable-DI, damit der
+	 * Cron-Key-Zugriff (mit Lazy-Init) und die adaptiven Limits erst zum
+	 * Aufrufzeitpunkt ausgewertet werden.
+	 *
+	 * @var SBU_Queue_Engine
+	 */
+	private $queue_engine;
+
+	/**
 	 * Initialize plugin hooks and actions.
 	 */
 	public function __construct() {
+		$this->activity_logger = new SBU_Activity_Log( array( $this, 'get_settings' ) );
+		$this->mail_notifier   = new SBU_Mail_Notifier( array( $this, 'get_settings' ) );
+		$this->queue_engine    = new SBU_Queue_Engine(
+			function () {
+				return $this->get_cron_key();
+			},
+			function () {
+				return $this->get_adaptive_limits();
+			}
+		);
+
 		// Load translations
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 
@@ -67,12 +109,17 @@ final class SBU_Plugin {
 		add_action( 'wp_dashboard_setup', array( $this, 'register_widget' ) );
 		add_action( 'updraftplus_backup_complete', array( $this, 'on_backup_complete' ) );
 		add_action( SBU_CRON_HOOK, array( $this, 'cron_process_queue' ) );
-		// Täglicher Cron fürs Aktivitätsprotokoll-Pruning. Scheduling in
-		// ensure_activity_retention_cron() — scharf gemacht beim ersten
-		// Admin-Init, so dass bestehende Installationen ohne neue
-		// Aktivierung abgedeckt sind.
-		add_action( SBU_ACTIVITY_RETENTION_CRON_HOOK, array( $this, 'cron_prune_activity_log' ) );
-		add_action( 'admin_init', array( $this, 'ensure_activity_retention_cron' ) );
+		// Täglicher Cron fürs Aktivitätsprotokoll-Pruning. Scheduling im
+		// Service selbst (ensure_cron beim admin_init), damit bestehende
+		// Installationen ohne neue Aktivierung abgedeckt sind.
+		add_action( SBU_ACTIVITY_RETENTION_CRON_HOOK, array( $this->activity_logger, 'cron_prune' ) );
+		add_action( 'admin_init', array( $this->activity_logger, 'ensure_cron' ) );
+		// Zero-Traffic-Backstop für die Retention: auf idle Sites ohne aktive
+		// Queue feuert weder log() noch WP-Cron zuverlässig. Der admin_init-
+		// Pfad greift spätestens beim Admin-Login und schlägt den verspäteten
+		// Prune nach. Bei leerem Log oder retention=0 ist das ein No-Op
+		// (cron_prune() bricht früh ab), also günstig.
+		add_action( 'admin_init', array( $this->activity_logger, 'cron_prune' ) );
 		foreach ( array( 'test', 'upload', 'list', 'download', 'download_all', 'delete', 'get_log', 'export_log', 'export_log_anon', 'clear_log', 'upload_status', 'load_libs', 'load_dirs', 'create_dir', 'save_settings', 'reset_settings', 'refresh_nonce', 'abort_upload', 'pause_upload', 'resume_upload', 'kick', 'dismiss_restore_banner', 'rotate_cron_key' ) as $a ) {
 			add_action( 'wp_ajax_sbu_' . $a, array( $this, 'ajax_' . $a ) );
 		}
@@ -439,7 +486,7 @@ final class SBU_Plugin {
 		delete_transient( SBU_TOK );
 		$o[] = __( '  ✓ Einstellungen gespeichert', 'seafile-updraft-backup-uploader' );
 
-		$this->activity_log( 'TEST', __( 'Verbindungstest erfolgreich', 'seafile-updraft-backup-uploader' ) . ( $lib ? ' → ' . $lib . $folder : '' ) );
+		$this->activity_logger->log( 'TEST', __( 'Verbindungstest erfolgreich', 'seafile-updraft-backup-uploader' ) . ( $lib ? ' → ' . $lib . $folder : '' ) );
 		wp_send_json_success( implode( "\n", $o ) );
 	}
 
@@ -487,7 +534,7 @@ final class SBU_Plugin {
 		// and race against the terminated tick's stale mid-loop writes.
 		wp_clear_scheduled_hook( SBU_CRON_HOOK );
 		delete_transient( 'sbu_progress' );
-		$this->activity_log( 'INFO', __( 'Vorgang manuell abgebrochen', 'seafile-updraft-backup-uploader' ) );
+		$this->activity_logger->log( 'INFO', __( 'Vorgang manuell abgebrochen', 'seafile-updraft-backup-uploader' ) );
 		wp_send_json_success( 'ok' );
 	}
 
@@ -518,7 +565,7 @@ final class SBU_Plugin {
 			$fn     = basename( $fi['path'] );
 			$offset = (int) ( $fi['offset'] ?? 0 );
 			$size   = (int) ( $fi['size'] ?? 0 );
-			$this->activity_log(
+			$this->activity_logger->log(
 				'INFO',
 				sprintf(
 					/* translators: %1$s file, %2$s progress */
@@ -528,7 +575,7 @@ final class SBU_Plugin {
 				)
 			);
 		} else {
-			$this->activity_log( 'INFO', __( 'Upload pausiert', 'seafile-updraft-backup-uploader' ) );
+			$this->activity_logger->log( 'INFO', __( 'Upload pausiert', 'seafile-updraft-backup-uploader' ) );
 		}
 
 		wp_send_json_success( 'ok' );
@@ -560,7 +607,7 @@ final class SBU_Plugin {
 			$fn     = basename( $fi['path'] );
 			$offset = (int) ( $fi['offset'] ?? 0 );
 			$size   = (int) ( $fi['size'] ?? 0 );
-			$this->activity_log(
+			$this->activity_logger->log(
 				'INFO',
 				sprintf(
 					/* translators: %1$s file, %2$s progress */
@@ -570,11 +617,11 @@ final class SBU_Plugin {
 				)
 			);
 		} else {
-			$this->activity_log( 'INFO', __( 'Upload fortgesetzt', 'seafile-updraft-backup-uploader' ) );
+			$this->activity_logger->log( 'INFO', __( 'Upload fortgesetzt', 'seafile-updraft-backup-uploader' ) );
 		}
 
-		$this->schedule_next_tick( 5 );
-		$this->spawn_next_tick();
+		$this->queue_engine->schedule_next_tick( 5 );
+		$this->queue_engine->spawn_next_tick();
 		wp_send_json_success( 'ok' );
 	}
 
@@ -745,16 +792,16 @@ final class SBU_Plugin {
 			$h .= '</div>';
 			$h .= '<div class="sbu-bk-row2">' . $badges . '</div>';
 			$h .= '<div class="sbu-bk-row3">';
-			$h .= '<a href="#" class="sbu-toggle" onclick="sbuToggle(\'sbu-files-' . $idx . '\',this);return false;">' . __( 'Dateien anzeigen', 'seafile-updraft-backup-uploader' ) . '</a>';
+			$h .= '<a href="#" class="sbu-toggle" data-sbu-action="toggle-files" data-target="sbu-files-' . (int) $idx . '">' . __( 'Dateien anzeigen', 'seafile-updraft-backup-uploader' ) . '</a>';
 			if ( $local_state === 'full' ) {
 				// Alle Dateien lokal — Wiederherstellen weglassen und direkt
 				// zu UpdraftPlus verlinken. Das spart einen Download-Durchlauf,
 				// der nur Duplikate prüfen würde.
 				$h .= '<a href="' . esc_url( $up_url ) . '" class="button button-small btn-restore">' . esc_html__( 'In UpdraftPlus öffnen', 'seafile-updraft-backup-uploader' ) . '</a>';
 			} else {
-				$h .= '<button class="button button-small btn-restore" onclick="sDlAll(\'' . esc_js( $dn ) . '\')">' . __( 'Wiederherstellen', 'seafile-updraft-backup-uploader' ) . '</button>';
+				$h .= '<button class="button button-small btn-restore" data-sbu-action="restore-all" data-dir="' . esc_attr( $dn ) . '">' . __( 'Wiederherstellen', 'seafile-updraft-backup-uploader' ) . '</button>';
 			}
-			$h .= '<button class="button button-small btn-delete" onclick="sDe(\'' . esc_js( $dn ) . '\')">' . __( 'Löschen', 'seafile-updraft-backup-uploader' ) . '</button>';
+			$h .= '<button class="button button-small btn-delete" data-sbu-action="delete-backup" data-dir="' . esc_attr( $dn ) . '">' . __( 'Löschen', 'seafile-updraft-backup-uploader' ) . '</button>';
 			$h .= '</div></div>';
 
 			// Collapsible file list
@@ -769,7 +816,7 @@ final class SBU_Plugin {
 					$h .= '<div class="sbu-bk-file">';
 					$h .= '<span class="sbu-bk-fn">' . $fn . '</span>';
 					$h .= '<span class="sbu-bk-fs">' . $fm . ' MB</span>';
-					$h .= '<button class="button button-small" onclick="sDl(\'' . esc_js( $dn ) . '\',\'' . esc_js( $f['name'] ) . '\')">' . __( 'Download', 'seafile-updraft-backup-uploader' ) . '</button>';
+					$h .= '<button class="button button-small" data-sbu-action="download-file" data-dir="' . esc_attr( $dn ) . '" data-file="' . esc_attr( $f['name'] ) . '">' . __( 'Download', 'seafile-updraft-backup-uploader' ) . '</button>';
 					$h .= '</div>';
 				}
 			}
@@ -817,7 +864,7 @@ final class SBU_Plugin {
 		}
 
 		$mb = round( filesize( $dest ) / 1024 / 1024, 1 );
-		$this->activity_log( 'RESTORE', __( 'Einzelne Datei heruntergeladen', 'seafile-updraft-backup-uploader' ) . ": {$fn} ({$mb} MB) ← {$dir}" );
+		$this->activity_logger->log( 'RESTORE', __( 'Einzelne Datei heruntergeladen', 'seafile-updraft-backup-uploader' ) . ": {$fn} ({$mb} MB) ← {$dir}" );
 		wp_send_json_success( $fn . " ({$mb} MB)\n\n" . __( 'In UpdraftPlus auf "Lokalen Ordner neu scannen" klicken.', 'seafile-updraft-backup-uploader' ) );
 	}
 
@@ -896,7 +943,7 @@ final class SBU_Plugin {
 		}
 
 		if ( empty( $file_list ) ) {
-			$this->activity_log( 'DUPLIKAT', __( 'Restore übersprungen: alle Dateien bereits lokal vorhanden', 'seafile-updraft-backup-uploader' ) . ": {$dir}" );
+			$this->activity_logger->log( 'DUPLIKAT', __( 'Restore übersprungen: alle Dateien bereits lokal vorhanden', 'seafile-updraft-backup-uploader' ) . ": {$dir}" );
 			wp_send_json_success( __( 'Alle Backup-Dateien sind bereits lokal vorhanden.', 'seafile-updraft-backup-uploader' ) . "\n\n" . __( 'In UpdraftPlus auf "Lokalen Ordner neu scannen" klicken.', 'seafile-updraft-backup-uploader' ) );
 		}
 
@@ -923,11 +970,11 @@ final class SBU_Plugin {
 		update_option( SBU_QUEUE, $queue, false );
 
 		$count = count( $file_list );
-		$this->activity_log( 'RESTORE', "Wiederherstellung gestartet: {$dir} ({$count} Dateien)" );
+		$this->activity_logger->log( 'RESTORE', "Wiederherstellung gestartet: {$dir} ({$count} Dateien)" );
 
 		// Start processing immediately
-		$this->schedule_next_tick( 5 );
-		$this->spawn_next_tick();
+		$this->queue_engine->schedule_next_tick( 5 );
+		$this->queue_engine->spawn_next_tick();
 
 		/* translators: %d is the number of files being restored */
 		wp_send_json_success( sprintf( __( 'Wiederherstellung gestartet: %d Dateien werden von Seafile heruntergeladen.', 'seafile-updraft-backup-uploader' ), $count ) );
@@ -968,7 +1015,7 @@ final class SBU_Plugin {
 				wp_send_json_error( $result->get_error_message() );
 			}
 		}
-		$this->activity_log( 'LÖSCHEN', __( 'Backup manuell gelöscht', 'seafile-updraft-backup-uploader' ) . ": {$dir}" );
+		$this->activity_logger->log( 'LÖSCHEN', __( 'Backup manuell gelöscht', 'seafile-updraft-backup-uploader' ) . ": {$dir}" );
 
 		// Drop stored integrity hashes for this folder — nothing to verify
 		// against anymore, and keeping them bloats the option row.
@@ -991,7 +1038,7 @@ final class SBU_Plugin {
 		$this->verify_ajax_request();
 		wp_cache_delete( SBU_ACTIVITY, 'options' );
 		$log = get_option( SBU_ACTIVITY, '' );
-		wp_send_json_success( $log ? $this->format_activity_log( $log ) : '' );
+		wp_send_json_success( $log ? $this->activity_logger->format( $log ) : '' );
 	}
 
 	/**
@@ -1170,7 +1217,7 @@ final class SBU_Plugin {
 				)
 			);
 		}
-		if ( $this->tick_is_gated() ) {
+		if ( $this->queue_engine->tick_is_gated() ) {
 			wp_send_json_success(
 				array(
 					'kicked' => false,
@@ -1178,7 +1225,7 @@ final class SBU_Plugin {
 				)
 			);
 		}
-		if ( ! $this->acquire_queue_lock( $this->queue_lock_ttl() ) ) {
+		if ( ! $this->queue_engine->acquire_lock( $this->queue_engine->default_lock_ttl() ) ) {
 			wp_send_json_success(
 				array(
 					'kicked' => false,
@@ -1189,7 +1236,7 @@ final class SBU_Plugin {
 		try {
 			$this->process_queue_tick();
 		} finally {
-			$this->release_queue_lock();
+			$this->queue_engine->release_lock();
 		}
 		wp_send_json_success( array( 'kicked' => true ) );
 	}
@@ -1206,6 +1253,27 @@ final class SBU_Plugin {
 			update_option( 'sbu_cron_key', $key, false );
 		}
 		return $key;
+	}
+
+	/**
+	 * Count invalid cron-key attempts and raise a WARNUNG once they pile up.
+	 *
+	 * Ein kurzlebiges Transient (1 h) zählt 403-Ablehnungen im Cron-Ping. Bei
+	 * der ersten Häufung wird ein WARNUNG-Eintrag ins Aktivitätsprotokoll
+	 * geschrieben — das sieht der Admin beim nächsten Login, ohne dass wir
+	 * externe Alerting-Pfade brauchen. Schwelle bewusst niedrig (5 Fehl-
+	 * versuche), damit ein einzelner Fehlkonfigurations-Test nicht sofort
+	 * feuert, aber automatisiertes Abklopfen auffliegt.
+	 */
+	private function record_cron_key_failure() {
+		$count = (int) get_transient( 'sbu_cron_key_fails' );
+		++$count;
+		set_transient( 'sbu_cron_key_fails', $count, HOUR_IN_SECONDS );
+		// Flankentrigger: nur bei Überschreiten der Schwelle EINMAL loggen,
+		// damit wir die Log-Zeilen nicht in einer Brute-Force-Welle fluten.
+		if ( 5 === $count ) {
+			$this->activity_logger->log( 'WARNUNG', 'Cron-Ping: 5 ungültige Schlüssel-Versuche in der letzten Stunde. Wenn das nicht du warst, Schlüssel über „Schlüssel rotieren" austauschen.' );
+		}
 	}
 
 	/**
@@ -1245,6 +1313,7 @@ final class SBU_Plugin {
 	public function ajax_cron_ping() {
 		$key = $this->extract_cron_key_from_request();
 		if ( ! hash_equals( $this->get_cron_key(), $key ) ) {
+			$this->record_cron_key_failure();
 			wp_send_json_error( __( 'Ungültiger Schlüssel.', 'seafile-updraft-backup-uploader' ), 403 );
 		}
 		$queue = get_option( SBU_QUEUE );
@@ -1265,7 +1334,7 @@ final class SBU_Plugin {
 		// key into a worker-pool DoS. Longer backoff waits are walked
 		// by a chain of short sleeps, each spawned via a fresh
 		// loopback — same net latency, much smaller blast radius.
-		if ( $this->tick_is_gated() ) {
+		if ( $this->queue_engine->tick_is_gated() ) {
 			$q2      = get_option( SBU_QUEUE );
 			$gate_ts = is_array( $q2 ) ? (int) ( $q2['next_allowed_tick_ts'] ?? 0 ) : 0;
 			$lim     = $this->get_adaptive_limits();
@@ -1276,8 +1345,8 @@ final class SBU_Plugin {
 				@set_time_limit( $wait + (int) $lim['tick_time'] + 30 );
 				sleep( $wait );
 			}
-			if ( $this->tick_is_gated() ) {
-				$this->spawn_next_tick();
+			if ( $this->queue_engine->tick_is_gated() ) {
+				$this->queue_engine->spawn_next_tick();
 				wp_send_json_success(
 					array(
 						'status' => 'slept',
@@ -1287,13 +1356,13 @@ final class SBU_Plugin {
 			}
 			// Gate expired during sleep — fall through and run a tick.
 		}
-		if ( ! $this->acquire_queue_lock( $this->queue_lock_ttl() ) ) {
+		if ( ! $this->queue_engine->acquire_lock( $this->queue_engine->default_lock_ttl() ) ) {
 			wp_send_json_success( array( 'status' => 'locked' ) );
 		}
 		try {
 			$this->process_queue_tick();
 		} finally {
-			$this->release_queue_lock();
+			$this->queue_engine->release_lock();
 		}
 		wp_send_json_success( array( 'status' => 'processed' ) );
 	}
@@ -1308,7 +1377,7 @@ final class SBU_Plugin {
 		$this->verify_ajax_request();
 		$new_key = wp_generate_password( 32, false );
 		update_option( 'sbu_cron_key', $new_key, false );
-		$this->activity_log( 'SETTINGS', __( 'Externer Cron-Schlüssel rotiert', 'seafile-updraft-backup-uploader' ) );
+		$this->activity_logger->log( 'SETTINGS', __( 'Externer Cron-Schlüssel rotiert', 'seafile-updraft-backup-uploader' ) );
 		wp_send_json_success(
 			array(
 				'key'        => $new_key,
@@ -1316,60 +1385,6 @@ final class SBU_Plugin {
 				'url_header' => admin_url( 'admin-ajax.php?action=sbu_cron_ping' ),
 			)
 		);
-	}
-
-	/**
-	 * Lock name used to serialize queue processing across kicks, cron ticks,
-	 * and the admin stalled-queue fallback.
-	 */
-	const QUEUE_LOCK_OPTION = 'sbu_queue_lock';
-
-	/**
-	 * Try to acquire the queue-processing lock atomically.
-	 *
-	 * Relies on `add_option()`'s built-in existence check so that two
-	 * concurrent ticks can't both enter process_queue_tick(). Stores the
-	 * lock's expiry timestamp so a process that died mid-tick doesn't
-	 * permanently wedge the queue: a lock whose expiry is in the past is
-	 * deleted and takeover is attempted.
-	 *
-	 * @param int $ttl Seconds until the lock is considered stale.
-	 * @return bool True if the caller now holds the lock.
-	 */
-	private function acquire_queue_lock( $ttl ) {
-		// Bypass the options cache to avoid stale reads from parallel workers.
-		wp_cache_delete( self::QUEUE_LOCK_OPTION, 'options' );
-		$existing = (int) get_option( self::QUEUE_LOCK_OPTION, 0 );
-
-		if ( $existing > 0 && $existing > time() ) {
-			return false;
-		}
-		if ( $existing > 0 ) {
-			delete_option( self::QUEUE_LOCK_OPTION );
-		}
-
-		// add_option() returns false if another tick won the race.
-		return (bool) add_option( self::QUEUE_LOCK_OPTION, time() + $ttl, '', false );
-	}
-
-	/**
-	 * Release the queue-processing lock. Also clears the legacy transient
-	 * from <1.2 installs mid-queue during the upgrade.
-	 */
-	private function release_queue_lock() {
-		delete_option( self::QUEUE_LOCK_OPTION );
-		delete_transient( 'sbu_processing_lock' );
-	}
-
-	/**
-	 * Default lock TTL covering one adaptive tick plus the longest per-chunk
-	 * timeout plus a safety margin.
-	 *
-	 * @return int Seconds.
-	 */
-	private function queue_lock_ttl() {
-		$lim = $this->get_adaptive_limits();
-		return $lim['tick_time'] + max( SBU_TIMEOUT_UPLOAD, SBU_TIMEOUT_DOWNLOAD ) + 30;
 	}
 
 	/**
@@ -1677,25 +1692,6 @@ final class SBU_Plugin {
 	}
 
 	/**
-	 * Whether the queue is within a backoff window and a fresh tick
-	 * should not start yet. Kept out of the acquire-lock path so that
-	 * loopback pings and WP-Cron fires can be rejected cheaply while
-	 * still allowing admin-visible state (paused, done) to pass
-	 * through the entry points normally.
-	 *
-	 * @return bool
-	 */
-	private function tick_is_gated() {
-		wp_cache_delete( SBU_QUEUE, 'options' );
-		$queue = get_option( SBU_QUEUE );
-		if ( ! is_array( $queue ) ) {
-			return false;
-		}
-		$gate = (int) ( $queue['next_allowed_tick_ts'] ?? 0 );
-		return $gate > time();
-	}
-
-	/**
 	 * Detect whether the previous tick died silently (PHP killed by
 	 * hosting, OOM, Cloudflare 524 on the worker path). A stale queue
 	 * that is NOT in a planned backoff window implies a crash.
@@ -1717,7 +1713,7 @@ final class SBU_Plugin {
 			return false;
 		}
 		$idle      = time() - $last;
-		$threshold = $this->queue_lock_ttl() + 30;
+		$threshold = $this->queue_engine->default_lock_ttl() + 30;
 		if ( $idle <= $threshold ) {
 			return false;
 		}
@@ -1729,7 +1725,7 @@ final class SBU_Plugin {
 		$off  = round( ( $file['offset'] ?? 0 ) / 1024 / 1024, 1 );
 		$mins = round( $idle / 60, 1 );
 
-		$this->activity_log(
+		$this->activity_logger->log(
 			'WARNUNG',
 			sprintf(
 				/* translators: %1$s minutes since last activity, %2$s file name, %3$s offset in MB */
@@ -1748,7 +1744,7 @@ final class SBU_Plugin {
 		$queue['next_allowed_tick_ts'] = time() + $delay;
 		$queue['last_activity']        = time();
 		update_option( SBU_QUEUE, $queue, false );
-		$this->schedule_next_tick( $delay );
+		$this->queue_engine->schedule_next_tick( $delay );
 		return true;
 	}
 
@@ -1811,8 +1807,8 @@ final class SBU_Plugin {
 			$progress,
 			$hrs_stalled
 		);
-		$this->send_notification( false, $msg );
-		$this->activity_log(
+		$this->mail_notifier->send( false, $msg );
+		$this->activity_logger->log(
 			'WARNUNG',
 			sprintf(
 				/* translators: %1$s filename, %2$s progress string, %3$s hours stalled */
@@ -2031,7 +2027,7 @@ final class SBU_Plugin {
 		$log_parts[] = 'Auto=' . ( $clean['auto'] ? 'Ja' : 'Nein' );
 		$log_parts[] = 'DelLocal=' . ( $clean['del_local'] ? 'Ja' : 'Nein' );
 		$log_parts[] = 'Notify=' . $clean['notify'];
-		$this->activity_log( 'SETTINGS', implode( ', ', $log_parts ) );
+		$this->activity_logger->log( 'SETTINGS', implode( ', ', $log_parts ) );
 
 		wp_send_json_success( 'ok' );
 	}
@@ -2043,7 +2039,7 @@ final class SBU_Plugin {
 	 */
 	public function ajax_reset_settings() {
 		$this->verify_ajax_request();
-		$this->activity_log( 'SETTINGS', __( 'Einstellungen zurückgesetzt', 'seafile-updraft-backup-uploader' ) );
+		$this->activity_logger->log( 'SETTINGS', __( 'Einstellungen zurückgesetzt', 'seafile-updraft-backup-uploader' ) );
 		delete_option( SBU_OPT );
 		delete_transient( SBU_TOK );
 		wp_send_json_success( 'ok' );
@@ -2087,11 +2083,11 @@ final class SBU_Plugin {
 			$existing['status'] = 'aborted';
 			update_option( SBU_QUEUE, $existing, false );
 			wp_clear_scheduled_hook( SBU_CRON_HOOK );
-			$this->release_queue_lock();
+			$this->queue_engine->release_lock();
 			delete_transient( 'sbu_progress' );
 			delete_option( 'sbu_abort_ts' );
 			delete_transient( 'sbu_abort_flag' );
-			$this->activity_log( 'INFO', __( 'Vorheriger Vorgang abgebrochen: neues Backup von UpdraftPlus', 'seafile-updraft-backup-uploader' ) );
+			$this->activity_logger->log( 'INFO', __( 'Vorheriger Vorgang abgebrochen: neues Backup von UpdraftPlus', 'seafile-updraft-backup-uploader' ) );
 		}
 
 		$nonce = $this->current_updraft_nonce();
@@ -2138,15 +2134,15 @@ final class SBU_Plugin {
 		$s = $this->get_settings();
 
 		if ( ! $s['url'] || ! $s['user'] || ! $s['pass'] ) {
-			$this->activity_log( 'FEHLER', __( 'Zugangsdaten unvollständig', 'seafile-updraft-backup-uploader' ) );
-			$this->send_notification( false, 'Credentials incomplete.' );
+			$this->activity_logger->log( 'FEHLER', __( 'Zugangsdaten unvollständig', 'seafile-updraft-backup-uploader' ) );
+			$this->mail_notifier->send( false, 'Credentials incomplete.' );
 			return new \WP_Error( 'cfg', __( 'Zugangsdaten unvollständig.', 'seafile-updraft-backup-uploader' ) );
 		}
 
 		$pw = SBU_Crypto::decrypt( $s['pass'] );
 		$ud = $this->get_updraft_dir();
 		if ( ! $ud ) {
-			$this->activity_log( 'FEHLER', __( 'UpdraftPlus-Verzeichnis nicht gefunden', 'seafile-updraft-backup-uploader' ) );
+			$this->activity_logger->log( 'FEHLER', __( 'UpdraftPlus-Verzeichnis nicht gefunden', 'seafile-updraft-backup-uploader' ) );
 			return new \WP_Error( 'dir', __( 'UpdraftPlus-Verzeichnis nicht gefunden.', 'seafile-updraft-backup-uploader' ) );
 		}
 
@@ -2157,14 +2153,14 @@ final class SBU_Plugin {
 
 		$t = SBU_Seafile_API::get_token( $s['url'], $s['user'], $pw );
 		if ( is_wp_error( $t ) ) {
-			$this->activity_log( 'FEHLER', __( 'Authentifizierung fehlgeschlagen', 'seafile-updraft-backup-uploader' ) . ': ' . $t->get_error_message() );
-			$this->send_notification( false, 'Authentication failed.' );
+			$this->activity_logger->log( 'FEHLER', __( 'Authentifizierung fehlgeschlagen', 'seafile-updraft-backup-uploader' ) . ': ' . $t->get_error_message() );
+			$this->mail_notifier->send( false, 'Authentication failed.' );
 			return $t;
 		}
 
 		$rid = SBU_Seafile_API::find_library( $s['url'], $t, $s['lib'] );
 		if ( is_wp_error( $rid ) ) {
-			$this->activity_log( 'FEHLER', __( 'Bibliothek nicht gefunden', 'seafile-updraft-backup-uploader' ) . ': ' . $s['lib'] );
+			$this->activity_logger->log( 'FEHLER', __( 'Bibliothek nicht gefunden', 'seafile-updraft-backup-uploader' ) . ': ' . $s['lib'] );
 			return $rid;
 		}
 
@@ -2182,11 +2178,11 @@ final class SBU_Plugin {
 		$local_names = array_keys( $local_fingerprint );
 		sort( $local_names );
 
-		$this->activity_log( 'INFO', "Duplikatprüfung: {$local_count} lokale Dateien, erste: {$local_names[0]}" );
+		$this->activity_logger->log( 'INFO', "Duplikatprüfung: {$local_count} lokale Dateien, erste: {$local_names[0]}" );
 
 		$existing = SBU_Seafile_API::list_directory( $s['url'], $t, $rid, $s['folder'] );
 		if ( is_wp_error( $existing ) ) {
-			$this->activity_log( 'INFO', 'Duplikatprüfung: Ordner konnte nicht gelesen werden: ' . $existing->get_error_message() );
+			$this->activity_logger->log( 'INFO', 'Duplikatprüfung: Ordner konnte nicht gelesen werden: ' . $existing->get_error_message() );
 		} elseif ( ! empty( $existing ) ) {
 			$dirs_checked = 0;
 			foreach ( $existing as $it ) {
@@ -2197,7 +2193,7 @@ final class SBU_Plugin {
 				$subdir       = rtrim( $s['folder'], '/' ) . '/' . $it['name'];
 				$remote_files = SBU_Seafile_API::list_directory( $s['url'], $t, $rid, $subdir );
 				if ( is_wp_error( $remote_files ) || empty( $remote_files ) ) {
-					$this->activity_log( 'INFO', "Duplikatprüfung: {$it['name']} übersprungen (leer oder Fehler)" );
+					$this->activity_logger->log( 'INFO', "Duplikatprüfung: {$it['name']} übersprungen (leer oder Fehler)" );
 					continue;
 				}
 
@@ -2211,13 +2207,13 @@ final class SBU_Plugin {
 
 				// Match by filenames
 				if ( $remote_names === $local_names ) {
-					$this->activity_log( 'DUPLIKAT', __( 'Backup bereits vorhanden auf Seafile', 'seafile-updraft-backup-uploader' ) . ': ' . $it['name'] . ' (' . $local_count . ' Dateien)' );
+					$this->activity_logger->log( 'DUPLIKAT', __( 'Backup bereits vorhanden auf Seafile', 'seafile-updraft-backup-uploader' ) . ': ' . $it['name'] . ' (' . $local_count . ' Dateien)' );
 					return __( 'Backup bereits vorhanden auf Seafile – Upload übersprungen.', 'seafile-updraft-backup-uploader' );
 				} else {
-					$this->activity_log( 'INFO', "Duplikatprüfung: {$it['name']}: " . count( $remote_names ) . " Remote vs {$local_count} lokal, keine Übereinstimmung" );
+					$this->activity_logger->log( 'INFO', "Duplikatprüfung: {$it['name']}: " . count( $remote_names ) . " Remote vs {$local_count} lokal, keine Übereinstimmung" );
 				}
 			}
-			$this->activity_log( 'INFO', "Duplikatprüfung abgeschlossen: kein Duplikat ({$dirs_checked} Ordner geprüft)" );
+			$this->activity_logger->log( 'INFO', "Duplikatprüfung abgeschlossen: kein Duplikat ({$dirs_checked} Ordner geprüft)" );
 		}
 
 		$ts = current_time( 'Y-m-d_Hi' );
@@ -2289,11 +2285,11 @@ final class SBU_Plugin {
 		update_option( 'sbu_verified', $verified, false );
 
 		$count = count( $file_list );
-		$this->activity_log( 'UPLOAD', "Queue erstellt: {$count} Dateien \xe2\x86\x92 {$ts}" );
+		$this->activity_logger->log( 'UPLOAD', "Queue erstellt: {$count} Dateien \xe2\x86\x92 {$ts}" );
 
 		// Start processing (self-chain + cron fallback)
-		$this->schedule_next_tick( 5 );
-		$this->spawn_next_tick();
+		$this->queue_engine->schedule_next_tick( 5 );
+		$this->queue_engine->spawn_next_tick();
 
 		return "Upload gestartet: {$count} Dateien \xe2\x86\x92 {$ts}";
 	}
@@ -2302,16 +2298,16 @@ final class SBU_Plugin {
 	 * WP-Cron handler.
 	 */
 	public function cron_process_queue() {
-		if ( $this->tick_is_gated() ) {
+		if ( $this->queue_engine->tick_is_gated() ) {
 			return;
 		}
-		if ( ! $this->acquire_queue_lock( $this->queue_lock_ttl() ) ) {
+		if ( ! $this->queue_engine->acquire_lock( $this->queue_engine->default_lock_ttl() ) ) {
 			return;
 		}
 		try {
 			$this->process_queue_tick();
 		} finally {
-			$this->release_queue_lock();
+			$this->queue_engine->release_lock();
 		}
 	}
 
@@ -2326,20 +2322,20 @@ final class SBU_Plugin {
 		if ( ( time() - ( $queue['last_activity'] ?? 0 ) ) < 90 ) {
 			return;
 		}
-		if ( $this->tick_is_gated() ) {
+		if ( $this->queue_engine->tick_is_gated() ) {
 			return;
 		}
 
 		// Atomic acquire prevents concurrent ticks from stepping on each other.
-		if ( ! $this->acquire_queue_lock( $this->queue_lock_ttl() ) ) {
+		if ( ! $this->queue_engine->acquire_lock( $this->queue_engine->default_lock_ttl() ) ) {
 			return;
 		}
 
 		try {
-			$this->activity_log( 'INFO', __( 'Queue fortgesetzt (Admin-Fallback)', 'seafile-updraft-backup-uploader' ) );
+			$this->activity_logger->log( 'INFO', __( 'Queue fortgesetzt (Admin-Fallback)', 'seafile-updraft-backup-uploader' ) );
 			$this->process_queue_tick();
 		} finally {
-			$this->release_queue_lock();
+			$this->queue_engine->release_lock();
 		}
 	}
 
@@ -2392,8 +2388,8 @@ final class SBU_Plugin {
 			update_option( SBU_QUEUE, $queue, false );
 			wp_clear_scheduled_hook( SBU_CRON_HOOK );
 			delete_transient( 'sbu_progress' );
-			$this->activity_log( 'FEHLER', "Queue-Timeout nach {$hours}h: {$queue['ok']} OK, {$queue['err']} Fehler" );
-			$this->send_notification( false, "Queue timed out after {$hours}h." );
+			$this->activity_logger->log( 'FEHLER', "Queue-Timeout nach {$hours}h: {$queue['ok']} OK, {$queue['err']} Fehler" );
+			$this->mail_notifier->send( false, "Queue timed out after {$hours}h." );
 			return;
 		}
 
@@ -2409,12 +2405,12 @@ final class SBU_Plugin {
 			$queue['status'] = 'aborted';
 			update_option( SBU_QUEUE, $queue, false );
 			wp_clear_scheduled_hook( SBU_CRON_HOOK );
-			$this->activity_log( 'INFO', __( 'Upload abgebrochen (Abort-Flag)', 'seafile-updraft-backup-uploader' ) );
+			$this->activity_logger->log( 'INFO', __( 'Upload abgebrochen (Abort-Flag)', 'seafile-updraft-backup-uploader' ) );
 			return;
 		}
 
 		// Pre-schedule next tick in case PHP crashes during this one
-		$this->schedule_next_tick( 90 );
+		$this->queue_engine->schedule_next_tick( 90 );
 
 		$s          = $this->get_settings();
 		$pw         = SBU_Crypto::decrypt( $s['pass'] );
@@ -2426,8 +2422,8 @@ final class SBU_Plugin {
 			if ( is_wp_error( $t ) ) {
 				$queue['status'] = 'error';
 				update_option( SBU_QUEUE, $queue, false );
-				$this->activity_log( 'FEHLER', __( 'Upload abgebrochen: Auth fehlgeschlagen', 'seafile-updraft-backup-uploader' ) );
-				$this->send_notification( false, 'Auth failed during upload.' );
+				$this->activity_logger->log( 'FEHLER', __( 'Upload abgebrochen: Auth fehlgeschlagen', 'seafile-updraft-backup-uploader' ) );
+				$this->mail_notifier->send( false, 'Auth failed during upload.' );
 				return;
 			}
 		}
@@ -2451,7 +2447,7 @@ final class SBU_Plugin {
 				$queue['status'] = 'aborted';
 				update_option( SBU_QUEUE, $queue, false );
 				wp_clear_scheduled_hook( SBU_CRON_HOOK );
-				$this->activity_log( 'INFO', __( 'Upload abgebrochen', 'seafile-updraft-backup-uploader' ) );
+				$this->activity_logger->log( 'INFO', __( 'Upload abgebrochen', 'seafile-updraft-backup-uploader' ) );
 				return;
 			}
 			if ( is_array( $fresh ) && ( $fresh['status'] ?? '' ) === 'paused' ) {
@@ -2459,7 +2455,7 @@ final class SBU_Plugin {
 				// paused queue DB row so resume continues at the right offset.
 				$this->safe_queue_update( $queue );
 				wp_clear_scheduled_hook( SBU_CRON_HOOK );
-				$this->activity_log( 'INFO', __( 'Upload pausiert', 'seafile-updraft-backup-uploader' ) );
+				$this->activity_logger->log( 'INFO', __( 'Upload pausiert', 'seafile-updraft-backup-uploader' ) );
 				return;
 			}
 
@@ -2471,7 +2467,7 @@ final class SBU_Plugin {
 				$queue['files'][ $idx ]['status'] = 'error';
 				++$queue['file_idx'];
 				++$queue['err'];
-				$this->activity_log( 'FEHLER', "Datei nicht gefunden: {$fn}" );
+				$this->activity_logger->log( 'FEHLER', "Datei nicht gefunden: {$fn}" );
 				continue;
 			}
 
@@ -2481,7 +2477,7 @@ final class SBU_Plugin {
 			if ( $offset === 0 ) {
 				$queue['files'][ $idx ]['status'] = 'uploading';
 				$mb                               = round( $fs / 1024 / 1024, 1 );
-				$this->activity_log( 'UPLOAD', "Start: {$fn} ({$mb} MB) — Datei " . ( $idx + 1 ) . '/' . count( $queue['files'] ) );
+				$this->activity_logger->log( 'UPLOAD', "Start: {$fn} ({$mb} MB) — Datei " . ( $idx + 1 ) . '/' . count( $queue['files'] ) );
 
 				// Lazy SHA1: once per file (offset===0 = first touch). sha1_file
 				// is streamed but iterates every byte, so we spread the cost
@@ -2494,7 +2490,7 @@ final class SBU_Plugin {
 					$sha_dt = microtime( true ) - $sha_t0;
 					if ( $sha ) {
 						$queue['files'][ $idx ]['sha1'] = $sha;
-						$this->activity_log(
+						$this->activity_logger->log(
 							'INFO',
 							sprintf(
 								/* translators: %1$s file, %2$s sha1 prefix, %3$.1f seconds */
@@ -2505,7 +2501,7 @@ final class SBU_Plugin {
 							)
 						);
 					} else {
-						$this->activity_log(
+						$this->activity_logger->log(
 							'WARNUNG',
 							sprintf(
 								/* translators: %s file name */
@@ -2539,7 +2535,7 @@ final class SBU_Plugin {
 						wp_clear_scheduled_hook( SBU_CRON_HOOK );
 						return;
 					}
-					$this->activity_log(
+					$this->activity_logger->log(
 						'RETRY',
 						sprintf(
 							/* translators: %1$s file name, %2$s error, %3$d attempt, %4$d seconds */
@@ -2568,14 +2564,14 @@ final class SBU_Plugin {
 					$queue['status'] = 'aborted';
 					update_option( SBU_QUEUE, $queue, false );
 					wp_clear_scheduled_hook( SBU_CRON_HOOK );
-					$this->activity_log( 'INFO', __( 'Upload abgebrochen', 'seafile-updraft-backup-uploader' ) );
+					$this->activity_logger->log( 'INFO', __( 'Upload abgebrochen', 'seafile-updraft-backup-uploader' ) );
 					return;
 				}
 				if ( is_array( $fresh_q ) && ( $fresh_q['status'] ?? '' ) === 'paused' ) {
 					$queue['files'][ $idx ]['offset'] = $offset;
 					$this->safe_queue_update( $queue );
 					wp_clear_scheduled_hook( SBU_CRON_HOOK );
-					$this->activity_log(
+					$this->activity_logger->log(
 						'INFO',
 						sprintf(
 							/* translators: %1$s file name, %2$s progress string */
@@ -2617,7 +2613,7 @@ final class SBU_Plugin {
 							return;
 						}
 						$chunk_mb = round( min( $csz, $fs - $offset ) / 1024 / 1024, 1 );
-						$this->activity_log(
+						$this->activity_logger->log(
 							'RETRY',
 							sprintf(
 								/* translators: %1$s file, %2$s progress, %3$.1f chunk MB, %4$.1f duration sec, %5$s error, %6$d attempt, %7$d delay sec */
@@ -2641,7 +2637,7 @@ final class SBU_Plugin {
 				// the limit, not every time it takes a normal-ish amount of time.
 				if ( $chunk_dt > ( SBU_TIMEOUT_UPLOAD * 0.75 ) ) {
 					$chunk_mb = round( min( $csz, $fs - $offset ) / 1024 / 1024, 1 );
-					$this->activity_log(
+					$this->activity_logger->log(
 						'WARNUNG',
 						sprintf(
 							/* translators: %1$s file, %2$.1f MB chunk size, %3$.1f seconds, %4$d timeout */
@@ -2681,7 +2677,7 @@ final class SBU_Plugin {
 					++$queue['ok'];
 					$queue['total_bytes'] += $fs;
 					$mb                    = round( $fs / 1024 / 1024, 1 );
-					$this->activity_log( 'UPLOAD', "\xe2\x9c\x93 {$fn} ({$mb} MB)" );
+					$this->activity_logger->log( 'UPLOAD', "\xe2\x9c\x93 {$fn} ({$mb} MB)" );
 					if ( $s['del_local'] ) {
 						@unlink( $fp );
 					}
@@ -2710,13 +2706,13 @@ final class SBU_Plugin {
 				wp_clear_scheduled_hook( SBU_CRON_HOOK );
 				return;
 			}
-			$this->schedule_next_tick( $delay );
+			$this->queue_engine->schedule_next_tick( $delay );
 			// Always fire a loopback ping. Its receivers (cron_process_queue,
 			// ajax_cron_ping, ajax_kick) honor next_allowed_tick_ts and drop
 			// the tick during the backoff window, so the ping is a no-op
 			// until the gate opens. This keeps broken-WP-Cron sites moving
 			// without the immediate-retry spam that existed before 1.2.1.
-			$this->spawn_next_tick();
+			$this->queue_engine->spawn_next_tick();
 		}
 	}
 
@@ -2736,7 +2732,7 @@ final class SBU_Plugin {
 		}
 		$actual = @sha1_file( $dest );
 		if ( ! $actual ) {
-			$this->activity_log(
+			$this->activity_logger->log(
 				'WARNUNG',
 				sprintf(
 					/* translators: %s filename */
@@ -2747,7 +2743,7 @@ final class SBU_Plugin {
 			return 'unverified';
 		}
 		if ( ! hash_equals( $expected, $actual ) ) {
-			$this->activity_log(
+			$this->activity_logger->log(
 				'FEHLER',
 				sprintf(
 					/* translators: %1$s file, %2$s expected hash, %3$s actual hash */
@@ -2776,7 +2772,7 @@ final class SBU_Plugin {
 			delete_transient( 'sbu_abort_flag' );
 			wp_clear_scheduled_hook( SBU_CRON_HOOK );
 			delete_transient( 'sbu_progress' );
-			$this->activity_log( 'INFO', __( 'Wiederherstellung abgebrochen', 'seafile-updraft-backup-uploader' ) );
+			$this->activity_logger->log( 'INFO', __( 'Wiederherstellung abgebrochen', 'seafile-updraft-backup-uploader' ) );
 			return;
 		}
 
@@ -2838,7 +2834,7 @@ final class SBU_Plugin {
 			if ( is_wp_error( $t ) ) {
 				$queue['status'] = 'error';
 				update_option( SBU_QUEUE, $queue, false );
-				$this->activity_log( 'FEHLER', __( 'Restore abgebrochen: Auth fehlgeschlagen', 'seafile-updraft-backup-uploader' ) );
+				$this->activity_logger->log( 'FEHLER', __( 'Restore abgebrochen: Auth fehlgeschlagen', 'seafile-updraft-backup-uploader' ) );
 				return;
 			}
 		}
@@ -2849,7 +2845,7 @@ final class SBU_Plugin {
 		// can see what the plugin picked for their server. Gated on a
 		// per-queue flag so long restores don't re-log every tick.
 		if ( empty( $queue['adaptive_logged'] ) ) {
-			$this->activity_log(
+			$this->activity_logger->log(
 				'INFO',
 				sprintf(
 					/* translators: %1$d tick budget seconds, %2$d parallel downloads, %3$d chunk MB */
@@ -2879,7 +2875,7 @@ final class SBU_Plugin {
 				++$pending_count;
 			}
 		}
-		$this->activity_log(
+		$this->activity_logger->log(
 			'TICK',
 			sprintf(
 				'start, budget=%ds, mode=%s, chunk_mb=%d, parallel=%d, files=%d done / %s current / %d pending',
@@ -2905,7 +2901,7 @@ final class SBU_Plugin {
 				$queue['status'] = 'aborted';
 				update_option( SBU_QUEUE, $queue, false );
 				wp_clear_scheduled_hook( SBU_CRON_HOOK );
-				$this->activity_log( 'INFO', __( 'Wiederherstellung abgebrochen', 'seafile-updraft-backup-uploader' ) );
+				$this->activity_logger->log( 'INFO', __( 'Wiederherstellung abgebrochen', 'seafile-updraft-backup-uploader' ) );
 				return;
 			}
 
@@ -2922,7 +2918,7 @@ final class SBU_Plugin {
 				@unlink( $dest ); // Clean start
 				$file_num = $idx + 1;
 				$total    = count( $queue['files'] );
-				$this->activity_log(
+				$this->activity_logger->log(
 					'RESTORE',
 					sprintf(
 						/* translators: %1$d file number, %2$d total files, %3$s filename, %4$.1f MB size */
@@ -2953,7 +2949,7 @@ final class SBU_Plugin {
 						wp_clear_scheduled_hook( SBU_CRON_HOOK );
 						return;
 					}
-					$this->activity_log(
+					$this->activity_logger->log(
 						'RETRY',
 						sprintf(
 							/* translators: %1$s file name, %2$s error, %3$d attempt, %4$d delay seconds */
@@ -3000,7 +2996,7 @@ final class SBU_Plugin {
 					$queue['files'][ $idx ]['retries'] = 0;
 					$queue['last_activity']            = time();
 					unset( $queue['next_allowed_tick_ts'] );
-					$this->activity_log(
+					$this->activity_logger->log(
 						'RESTORE',
 						sprintf(
 							'%s: Stream-Download ok (%.1f MB in %.1fs)',
@@ -3015,7 +3011,7 @@ final class SBU_Plugin {
 					$err_msg = $stream_res instanceof \WP_Error
 						? $stream_res->get_error_message()
 						: 'unknown';
-					$this->activity_log(
+					$this->activity_logger->log(
 						'INFO',
 						sprintf(
 							/* translators: %1$s filename, %2$s error, %3$.1f seconds */
@@ -3045,7 +3041,7 @@ final class SBU_Plugin {
 					$queue['status'] = 'aborted';
 					update_option( SBU_QUEUE, $queue, false );
 					wp_clear_scheduled_hook( SBU_CRON_HOOK );
-					$this->activity_log( 'INFO', __( 'Wiederherstellung abgebrochen', 'seafile-updraft-backup-uploader' ) );
+					$this->activity_logger->log( 'INFO', __( 'Wiederherstellung abgebrochen', 'seafile-updraft-backup-uploader' ) );
 					return;
 				}
 				// Pause check: persist offset and exit quietly.
@@ -3055,7 +3051,7 @@ final class SBU_Plugin {
 					$queue['files'][ $idx ]['offset'] = $offset;
 					$this->safe_queue_update( $queue );
 					wp_clear_scheduled_hook( SBU_CRON_HOOK );
-					$this->activity_log(
+					$this->activity_logger->log(
 						'INFO',
 						sprintf(
 							/* translators: %1$s file name, %2$s progress string */
@@ -3185,7 +3181,7 @@ final class SBU_Plugin {
 							$ranges[ $ri ]['url'] = $fresh;
 						}
 						if ( $refresh_ok ) {
-							$this->activity_log(
+							$this->activity_logger->log(
 								'INFO',
 								sprintf(
 									/* translators: %s filename */
@@ -3271,7 +3267,7 @@ final class SBU_Plugin {
 						: ( $any_transient
 							? ( $dominant_fatal ? "transient + {$dominant_fatal}" : 'transient' )
 							: ( $dominant_fatal ?: 'batch fail' ) );
-					$this->activity_log(
+					$this->activity_logger->log(
 						'RATE',
 						sprintf(
 							/* translators: %1$s prev mode, %2$s new mode, %3$d prev chunk MB, %4$d new chunk MB, %5$d prev parallel, %6$d new parallel, %7$s reason */
@@ -3299,7 +3295,7 @@ final class SBU_Plugin {
 					$start_mb = round( ( $r['start'] ?? 0 ) / 1048576, 1 );
 					$end_mb   = round( ( ( $r['end'] ?? 0 ) + 1 ) / 1048576, 1 );
 					if ( ! empty( $r['ok'] ) ) {
-						$this->activity_log(
+						$this->activity_logger->log(
 							'CHUNK',
 							sprintf(
 								'%s range=%s-%s MB OK bytes=%d dauer=%.2fs http=%d',
@@ -3319,7 +3315,7 @@ final class SBU_Plugin {
 							$err_code = $r['error']->get_error_code();
 							$err_msg  = $r['error']->get_error_message();
 						}
-						$this->activity_log(
+						$this->activity_logger->log(
 							'CHUNK',
 							sprintf(
 								'%s range=%s-%s MB FAIL bytes=%d dauer=%.2fs curl_errno=%d http=%d class=%s err=%s msg=%s',
@@ -3338,7 +3334,7 @@ final class SBU_Plugin {
 						);
 					}
 				}
-				$this->activity_log(
+				$this->activity_logger->log(
 					'BATCH',
 					sprintf(
 						'%s %d/%d ok, %.1f MB in %.2fs, mode=%s chunk_mb=%d parallel=%d',
@@ -3367,7 +3363,7 @@ final class SBU_Plugin {
 							}
 						}
 						/* translators: %s is the restore target filename that could not be opened for writing. */
-						$this->activity_log( 'FEHLER', sprintf( __( 'Restore %s: Zieldatei nicht beschreibbar', 'seafile-updraft-backup-uploader' ), $fn ) );
+						$this->activity_logger->log( 'FEHLER', sprintf( __( 'Restore %s: Zieldatei nicht beschreibbar', 'seafile-updraft-backup-uploader' ), $fn ) );
 						break;
 					}
 					$new_offset = $offset;
@@ -3410,7 +3406,7 @@ final class SBU_Plugin {
 					}
 					if ( $batch_dt > ( $tick_time_s * 0.75 ) ) {
 						$batch_mb = round( $prefix_bytes / 1024 / 1024, 1 );
-						$this->activity_log(
+						$this->activity_logger->log(
 							'WARNUNG',
 							sprintf(
 								/* translators: %1$s file, %2$s MB, %3$.1f seconds */
@@ -3466,7 +3462,7 @@ final class SBU_Plugin {
 						return;
 					}
 					$err_msg = $first_err instanceof \WP_Error ? $first_err->get_error_message() : 'unknown';
-					$this->activity_log(
+					$this->activity_logger->log(
 						'INFO',
 						sprintf(
 							/* translators: %1$s file, %2$d committed chunks, %3$d total, %4$s error, %5$d delay */
@@ -3515,7 +3511,7 @@ final class SBU_Plugin {
 						return;
 					}
 					$err_msg = $first_err instanceof \WP_Error ? $first_err->get_error_message() : 'unknown';
-					$this->activity_log(
+					$this->activity_logger->log(
 						'RETRY',
 						sprintf(
 							/* translators: %1$s file, %2$s progress, %3$.1f duration, %4$s error, %5$d attempt, %6$d delay */
@@ -3552,7 +3548,7 @@ final class SBU_Plugin {
 						$queue['ok']                      = max( 0, $queue['ok'] - 1 );
 					} else {
 						$badge = $verify_status === 'verified' ? "\xe2\x9c\x93\xe2\x9c\x93" : "\xe2\x9c\x93";
-						$this->activity_log( 'RESTORE', "{$badge} {$fn} ({$mb} MB)" );
+						$this->activity_logger->log( 'RESTORE', "{$badge} {$fn} ({$mb} MB)" );
 					}
 				}
 				++$queue['file_idx'];
@@ -3573,10 +3569,10 @@ final class SBU_Plugin {
 			$err = $queue['err'] ?? 0;
 			$dir = $queue['dir'] ?? '?';
 			if ( $err > 0 ) {
-				$this->activity_log( 'FEHLER', "Wiederherstellung mit Fehlern: {$dir} ({$ok} OK, {$err} Fehler)" );
+				$this->activity_logger->log( 'FEHLER', "Wiederherstellung mit Fehlern: {$dir} ({$ok} OK, {$err} Fehler)" );
 				$this->log_failed_files( $queue, 'Restore' );
 			} else {
-				$this->activity_log( 'RESTORE', __( 'Backup vollständig wiederhergestellt', 'seafile-updraft-backup-uploader' ) . ": {$dir} ({$ok} Dateien)" );
+				$this->activity_logger->log( 'RESTORE', __( 'Backup vollständig wiederhergestellt', 'seafile-updraft-backup-uploader' ) . ": {$dir} ({$ok} Dateien)" );
 				$total_bytes = 0;
 				foreach ( $queue['files'] as $_fi ) {
 					$total_bytes += (int) ( $_fi['size'] ?? 0 );
@@ -3606,10 +3602,10 @@ final class SBU_Plugin {
 				wp_clear_scheduled_hook( SBU_CRON_HOOK );
 				return;
 			}
-			$this->schedule_next_tick( $delay );
+			$this->queue_engine->schedule_next_tick( $delay );
 			// Always spawn a loopback — entry-point gate (next_allowed_tick_ts)
 			// bounces premature pings during backoff, so this is safe.
-			$this->spawn_next_tick();
+			$this->queue_engine->spawn_next_tick();
 		}
 	}
 
@@ -3644,7 +3640,7 @@ final class SBU_Plugin {
 	 * @internal
 	 */
 	public function spawn_next_tick_public() {
-		$this->spawn_next_tick();
+		$this->queue_engine->spawn_next_tick();
 	}
 
 	/**
@@ -3653,30 +3649,7 @@ final class SBU_Plugin {
 	 * @internal
 	 */
 	public function release_queue_lock_public() {
-		$this->release_queue_lock();
-	}
-
-	/**
-	 * Spawn a non-blocking self-request to continue queue processing.
-	 * Works without WP-Cron and without external services.
-	 */
-	private function spawn_next_tick() {
-		$url = admin_url( 'admin-ajax.php' );
-		// sslverify=false is acceptable here: this is a non-blocking loopback request to our own admin-ajax.php.
-		// The response is discarded (timeout 0.01, blocking=false), so strict TLS verification would only cause
-		// unnecessary failures on sites with self-signed dev certificates or behind reverse proxies that terminate TLS.
-		wp_remote_post(
-			$url,
-			array(
-				'timeout'   => 0.01,
-				'blocking'  => false,
-				'sslverify' => false,
-				'body'      => array(
-					'action' => 'sbu_cron_ping',
-					'key'    => $this->get_cron_key(),
-				),
-			)
-		);
+		$this->queue_engine->release_lock();
 	}
 
 	/**
@@ -3787,9 +3760,9 @@ final class SBU_Plugin {
 		);
 
 		if ( $success ) {
-			$this->activity_log( 'UPLOAD', __( 'Backup komplett', 'seafile-updraft-backup-uploader' ) . ": {$ok} Dateien ({$tmb} MB) \xe2\x86\x92 {$ts}" );
+			$this->activity_logger->log( 'UPLOAD', __( 'Backup komplett', 'seafile-updraft-backup-uploader' ) . ": {$ok} Dateien ({$tmb} MB) \xe2\x86\x92 {$ts}" );
 		} else {
-			$this->activity_log( 'FEHLER', __( 'Upload mit Fehlern', 'seafile-updraft-backup-uploader' ) . ": {$ok} OK, {$err} Fehler \xe2\x86\x92 {$ts}" );
+			$this->activity_logger->log( 'FEHLER', __( 'Upload mit Fehlern', 'seafile-updraft-backup-uploader' ) . ": {$ok} OK, {$err} Fehler \xe2\x86\x92 {$ts}" );
 			$this->log_failed_files( $queue, 'Upload' );
 		}
 
@@ -3807,7 +3780,7 @@ final class SBU_Plugin {
 			update_option( 'sbu_verified', $verified, false );
 			if ( $vresult['status'] === 'complete' ) {
 				$this->persist_backup_hashes( $queue );
-				$this->activity_log(
+				$this->activity_logger->log(
 					'VERIFIZIERT',
 					sprintf(
 						/* translators: %1$d total, %2$d with sha1 */
@@ -3818,7 +3791,7 @@ final class SBU_Plugin {
 				);
 			} else {
 				$issue_list = implode( ', ', $vresult['issues'] ?? array() );
-				$this->activity_log( 'WARNUNG', __( 'Backup unvollständig', 'seafile-updraft-backup-uploader' ) . ': ' . $issue_list );
+				$this->activity_logger->log( 'WARNUNG', __( 'Backup unvollständig', 'seafile-updraft-backup-uploader' ) . ': ' . $issue_list );
 			}
 
 			$this->enforce_retention( $s, $t, $queue['library_id'] );
@@ -3828,7 +3801,7 @@ final class SBU_Plugin {
 			$this->cleanup_updraft_history();
 		}
 
-		$this->send_notification( $success, $sum );
+		$this->mail_notifier->send( $success, $sum );
 		wp_clear_scheduled_hook( SBU_CRON_HOOK );
 	}
 
@@ -3960,14 +3933,6 @@ final class SBU_Plugin {
 		update_option( SBU_HASHES, $all, false );
 	}
 
-	/**
-	 * Schedule next queue tick.
-	 */
-	private function schedule_next_tick( $delay = 60 ) {
-		wp_clear_scheduled_hook( SBU_CRON_HOOK );
-		wp_schedule_single_event( time() + $delay, SBU_CRON_HOOK );
-	}
-
 	// RETENTION
 	// =========================================================================
 
@@ -4006,9 +3971,9 @@ final class SBU_Plugin {
 			$path   = rtrim( $s['folder'], '/' ) . '/' . $d;
 			$result = SBU_Seafile_API::delete_directory( $s['url'], $t, $rid, $path );
 			if ( is_wp_error( $result ) ) {
-				$this->activity_log( 'FEHLER', __( 'Altes Backup konnte nicht gelöscht werden', 'seafile-updraft-backup-uploader' ) . ": {$d} — " . $result->get_error_message() );
+				$this->activity_logger->log( 'FEHLER', __( 'Altes Backup konnte nicht gelöscht werden', 'seafile-updraft-backup-uploader' ) . ": {$d} — " . $result->get_error_message() );
 			} else {
-				$this->activity_log( 'LÖSCHEN', __( 'Altes Backup automatisch gelöscht (Aufbewahrung)', 'seafile-updraft-backup-uploader' ) . ": {$d}" );
+				$this->activity_logger->log( 'LÖSCHEN', __( 'Altes Backup automatisch gelöscht (Aufbewahrung)', 'seafile-updraft-backup-uploader' ) . ": {$d}" );
 				if ( is_array( $hashes ) && isset( $hashes[ $path ] ) ) {
 					unset( $hashes[ $path ] );
 					$hashes_changed = true;
@@ -4066,51 +4031,9 @@ final class SBU_Plugin {
 
 		if ( $changed ) {
 			update_option( 'updraft_backup_history', $history );
-			$this->activity_log( 'BEREINIGUNG', __( 'UpdraftPlus-Verlauf bereinigt (lokale Dateien gelöscht, Einträge entfernt)', 'seafile-updraft-backup-uploader' ) );
+			$this->activity_logger->log( 'BEREINIGUNG', __( 'UpdraftPlus-Verlauf bereinigt (lokale Dateien gelöscht, Einträge entfernt)', 'seafile-updraft-backup-uploader' ) );
 		}
 	}
-
-	// =========================================================================
-	// NOTIFICATIONS
-	// =========================================================================
-
-	/**
-	 * Send email notification about upload result.
-	 *
-	 * @param bool   $ok  Whether the upload was successful.
-	 * @param string $msg Summary message.
-	 */
-	private function send_notification( $ok, $msg ) {
-		$s = $this->get_settings();
-		if ( $s['notify'] === 'never' ) {
-			return;
-		}
-		if ( $s['notify'] === 'error' && $ok ) {
-			return;
-		}
-		if ( empty( $s['email'] ) ) {
-			return;
-		}
-
-		$site   = get_bloginfo( 'name' );
-		$status = $ok ? __( 'Erfolgreich', 'seafile-updraft-backup-uploader' ) : __( 'FEHLER', 'seafile-updraft-backup-uploader' );
-
-		$subject = "[Seafile Backup] {$site}: {$status}";
-		$body    = "Seafile Updraft Backup Uploader\n========================\n\n";
-		$body   .= __( 'Website: ', 'seafile-updraft-backup-uploader' ) . $site . "\n";
-		$body   .= "Status:  {$status}\n";
-		$body   .= __( 'Details: ', 'seafile-updraft-backup-uploader' ) . $msg . "\n";
-		$body   .= __( 'Target:  ', 'seafile-updraft-backup-uploader' ) . $s['lib'] . $s['folder'] . "\n";
-		$body   .= __( 'Zeit:    ', 'seafile-updraft-backup-uploader' ) . current_time( 'd.m.Y H:i:s' ) . "\n";
-
-		if ( ! $ok ) {
-			$body .= "\n" . __( 'Log prüfen: ', 'seafile-updraft-backup-uploader' );
-			$body .= admin_url( 'options-general.php?page=' . SBU_SLUG ) . "\n";
-		}
-
-		wp_mail( $s['email'], $subject, $body );
-	}
-
 
 	// =========================================================================
 	// HELPERS
@@ -4267,188 +4190,7 @@ final class SBU_Plugin {
 			}
 		}
 		if ( ! empty( $failed ) ) {
-			$this->activity_log( 'INFO', "{$context}: fehlgeschlagene Dateien: " . implode( ', ', $failed ) );
+			$this->activity_logger->log( 'INFO', "{$context}: fehlgeschlagene Dateien: " . implode( ', ', $failed ) );
 		}
-	}
-
-	/**
-	 * Append a line to the activity log.
-	 *
-	 * @param string $prefix Category token shown at the start of the line
-	 *                       (e.g. "RESTORE", "CHUNK", "BATCH", "RATE").
-	 * @param string $msg    Free-form message body.
-	 * @param string $level  'info' (always logged) or 'debug' (only logged
-	 *                       when the debug_log setting is on). Debug events
-	 *                       — per-chunk transcripts, tick markers — flood
-	 *                       the log during real restores, so they're gated
-	 *                       behind the setting and off by default.
-	 */
-	private function activity_log( $prefix, $msg, $level = 'info' ) {
-		if ( $level === 'debug' && empty( $this->get_settings()['debug_log'] ) ) {
-			return;
-		}
-		$entry = '[' . current_time( 'd.m.Y H:i:s' ) . '] ' . $prefix . ': ' . $msg;
-		wp_cache_delete( SBU_ACTIVITY, 'options' );
-		$log = get_option( SBU_ACTIVITY, '' );
-		// Prepend new entry (newest first)
-		$log = $entry . "\n" . $log;
-		// Trim to max lines
-		$lines = explode( "\n", $log );
-		if ( count( $lines ) > SBU_ACTIVITY_MAX ) {
-			$lines = array_slice( $lines, 0, SBU_ACTIVITY_MAX );
-		}
-		// Zeit-basiertes Prune direkt im Append-Pfad, damit das Log auch ohne
-		// aktiven Daily-Cron nicht über die Retention-Grenze hinauswächst. Die
-		// Kosten sind gering — wir parsen nur die vorderen Zeilen bis zur
-		// ersten "alten" und schneiden dort ab (Append erzeugt Newest-First).
-		$retention_days = $this->get_activity_retention_days();
-		if ( $retention_days > 0 ) {
-			$lines = $this->prune_activity_log_lines( $lines, $retention_days );
-		}
-		update_option( SBU_ACTIVITY, implode( "\n", $lines ), false );
-	}
-
-	/**
-	 * Current retention window in days, or 0 if disabled.
-	 *
-	 * Helper kept next to activity_log() so a future SBU_Activity_Log
-	 * extraction (see ARCH-001 in Sanierungsfahrplan) can pull this method
-	 * along with its callers without touching scattered getters.
-	 *
-	 * @return int
-	 */
-	private function get_activity_retention_days() {
-		$s    = $this->get_settings();
-		$days = intval( $s['activity_log_retention_days'] ?? SBU_ACTIVITY_RETENTION_DAYS_DEFAULT );
-		if ( 0 === $days ) {
-			return 0;
-		}
-		return max( 7, min( 365, $days ) );
-	}
-
-	/**
-	 * Drop activity-log lines whose timestamp is older than $days.
-	 *
-	 * Input is the newest-first line array used by activity_log(); lines
-	 * without a parseable timestamp (e.g. a blank trailing line) are kept
-	 * so we never lose data on a format surprise.
-	 *
-	 * @param array $lines Newest-first array of log lines.
-	 * @param int   $days  Retention window in days (> 0).
-	 * @return array Pruned lines, still newest-first.
-	 */
-	private function prune_activity_log_lines( array $lines, $days ) {
-		if ( $days <= 0 || empty( $lines ) ) {
-			return $lines;
-		}
-		// Cutoff als UTC-Unixzeit. DateTime::createFromFormat() mit
-		// wp_timezone() unten liefert getTimestamp() ebenfalls UTC — damit
-		// ist der Vergleich korrekt, unabhängig von der Site-Zeitzone.
-		$cutoff = time() - ( $days * DAY_IN_SECONDS );
-		$kept   = array();
-		foreach ( $lines as $line ) {
-			if ( ! preg_match( '/^\[(\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})\]/', $line, $m ) ) {
-				$kept[] = $line;
-				continue;
-			}
-			// strtotime() erwartet 'd.m.Y H:i:s' als deutsches Datum; wandel
-			// das explizit in ein DateTime, weil strtotime() in englischer
-			// Locale auf '03.04.2026' stolpert (würde als 3. April eingelesen,
-			// was zufällig klappt — aber wir wollen es deterministisch).
-			$dt = \DateTime::createFromFormat( 'd.m.Y H:i:s', $m[1], wp_timezone() );
-			if ( ! $dt ) {
-				$kept[] = $line;
-				continue;
-			}
-			if ( $dt->getTimestamp() >= $cutoff ) {
-				$kept[] = $line;
-			}
-		}
-		return $kept;
-	}
-
-	/**
-	 * Ensure the daily retention cron is scheduled exactly once.
-	 *
-	 * Hooked on admin_init so bestehende Installationen bekommen den Cron
-	 * beim ersten Admin-Aufruf — ohne dass der User re-aktivieren muss.
-	 * Doppelscheduling ist idempotent (wp_next_scheduled-Guard).
-	 */
-	public function ensure_activity_retention_cron() {
-		if ( ! wp_next_scheduled( SBU_ACTIVITY_RETENTION_CRON_HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', SBU_ACTIVITY_RETENTION_CRON_HOOK );
-		}
-	}
-
-	/**
-	 * Daily cron callback: re-read the log and prune by retention window.
-	 *
-	 * Runs independently of the append path so an idle site (no new
-	 * activity) still gets its retention enforced. Bails out quickly when
-	 * retention is disabled (0) or the log is empty.
-	 */
-	public function cron_prune_activity_log() {
-		$days = $this->get_activity_retention_days();
-		if ( $days <= 0 ) {
-			return;
-		}
-		wp_cache_delete( SBU_ACTIVITY, 'options' );
-		$log = get_option( SBU_ACTIVITY, '' );
-		if ( $log === '' ) {
-			return;
-		}
-		$lines = explode( "\n", $log );
-		$kept  = $this->prune_activity_log_lines( $lines, $days );
-		if ( count( $kept ) !== count( $lines ) ) {
-			update_option( SBU_ACTIVITY, implode( "\n", $kept ), false );
-		}
-	}
-
-	/**
-	 * Format activity log text with colored HTML spans per category.
-	 * Called from views/admin-page.php — must stay public.
-	 *
-	 * @param string $l Raw activity log text.
-	 * @return string HTML-formatted log.
-	 */
-	public function format_activity_log( $l ) {
-		$l = esc_html( $l );
-		// Each line is wrapped in a div carrying a data-cat attribute so
-		// the admin-page JS can show/hide categories without having to
-		// round-trip to the server. The span inside handles colouring.
-		$cats      = array(
-			'UPLOAD'      => 'g',
-			'LÖSCHEN'     => 'del',
-			'RESTORE'     => 'res',
-			'BEREINIGUNG' => 'dim',
-			'TEST'        => 'b',
-			'FEHLER'      => 'e',
-			'WARNUNG'     => 'e',
-			'INFO'        => 'b',
-			'RETRY'       => 'b',
-			'DUPLIKAT'    => 'b',
-			'SETTINGS'    => 'dim',
-			'VERIFIZIERT' => 'g',
-			'TICK'        => 'dim',
-			'BATCH'       => 'dim',
-			'CHUNK'       => 'dim',
-			'RATE'        => 'b',
-		);
-		$out_lines = array();
-		foreach ( explode( "\n", $l ) as $line ) {
-			if ( $line === '' ) {
-				continue;
-			}
-			if ( preg_match( '/^(\[.*?\]) ([A-ZÄÖÜ]+): /u', $line, $m ) ) {
-				$cat         = $m[2];
-				$klass       = $cats[ $cat ] ?? 'b';
-				$body        = substr( $line, strlen( $m[1] ) + 1 );
-				$out_lines[] = '<div class="sbu-log-line" data-cat="' . esc_attr( $cat ) . '">'
-					. $m[1] . ' <span class="' . esc_attr( $klass ) . '">' . $body . '</span></div>';
-			} else {
-				$out_lines[] = '<div class="sbu-log-line" data-cat="OTHER">' . $line . '</div>';
-			}
-		}
-		return implode( '', $out_lines );
 	}
 }

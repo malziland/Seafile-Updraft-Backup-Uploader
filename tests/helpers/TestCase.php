@@ -110,6 +110,16 @@ abstract class TestCase extends BaseTestCase {
         Functions\when( 'admin_url' )->alias( function ( $path = '' ) {
             return 'https://example.test/wp-admin/' . ltrim( (string) $path, '/' );
         } );
+        Functions\when( 'add_query_arg' )->alias( function ( $key, $value = null, $url = null ) {
+            if ( is_array( $key ) ) {
+                $base = (string) $value;
+                $sep  = ( strpos( $base, '?' ) === false ) ? '?' : '&';
+                return $base . $sep . http_build_query( $key );
+            }
+            $base = (string) $url;
+            $sep  = ( strpos( $base, '?' ) === false ) ? '?' : '&';
+            return $base . $sep . rawurlencode( (string) $key ) . '=' . rawurlencode( (string) $value );
+        } );
         Functions\when( 'wp_remote_post' )->justReturn( [] );
         Functions\when( 'wp_generate_password' )->alias( function ( $len = 12 ) {
             return str_repeat( 'x', (int) $len );

@@ -4,6 +4,37 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.3] — 2026-04-19
+
+Zweiter Audit-Durchgang: UI-Feinschliff, Härtung des internen Cron-Pfads, Rausziehen dreier Services aus der God-Class.
+
+### Hinzugefügt
+
+- **Brute-Force-Schutz für den internen Cron-Schlüssel** — fünf ungültige Versuche innerhalb einer Stunde lösen einmalig eine `WARNUNG`-Zeile im Aktivitätsprotokoll aus („Wenn das nicht du warst, Schlüssel rotieren"). Der Zähler läuft als 1-Stunden-Transient und wird bei der Warnung zurückgesetzt, damit echte Angriffs-Wiederholungen nicht stumm hochzählen.
+- **Zero-Traffic-Backstop für das Log-Pruning** — zusätzlich zum täglichen WP-Cron räumt die Retention jetzt auch beim ersten `admin_init` pro Admin-Zugriff auf. Idle-Sites ohne Queue-Aktivität bleiben damit innerhalb des Retention-Fensters.
+
+### Geändert
+
+- **Cron-Key im Header statt im POST-Body** — der interne Loopback-Spawn sendet den Schlüssel jetzt über den `X-SBU-Cron-Key`-Header. Er taucht damit nicht mehr in Debug-/Error-Tracker-Dumps auf, die Request-Bodies mitloggen. Rückwärtskompatibel: der Empfänger prüft weiterhin Header, Query-Param und Body in dieser Reihenfolge.
+- **Status-Pillen in der Backup-Liste zentriert** — `Lokal vollständig` / `Teilweise lokal` / `Nur remote` und der Verify-Status sitzen jetzt auf einer sauberen Baseline statt treppenartig versetzt. Ursache war ein `align-items:baseline`-Flex-Layout, das bei Mixed-Font-Size-Kindern eine Treppe baut; jetzt `align-items:center` mit konsistenter `line-height`.
+- **24 Inline-`onclick`-Handler aus der Backup-Liste entfernt** — die Buttons in `ajax_list` nutzen jetzt ebenfalls `data-sbu-action`-Attribute. Kombiniert mit dem 1.0.2-Cleanup im Admin-Template ist das Plugin damit vollständig inline-JavaScript-frei — strengere Content-Security-Policies durchsetzbar.
+
+### Refaktoriert
+
+- **ARCH-001 Schritt 1 — `SBU_Activity_Log` als eigene Klasse** — Schreiben, Zeilen- und Zeit-basierte Retention, Cron-Scheduling und Admin-Render-Helfer leben in `includes/class-sbu-activity-log.php`. Konstruktor bekommt einen Settings-Provider als `callable` injiziert, damit die Klasse nicht auf `SBU_Plugin` koppelt. 77 Aufrufstellen umgestellt, Verhalten identisch.
+- **ARCH-001 Schritt 2 — `SBU_Mail_Notifier` als eigene Klasse** — Admin-E-Mails (Erfolg/Fehler/Stillstand) fliegen jetzt durch `includes/class-sbu-mail-notifier.php`. Gleicher DI-Ansatz via Settings-Provider-Callable.
+- **ARCH-001 Schritt 3 — `SBU_Queue_Engine` als eigene Klasse** — die reine Queue-Infrastruktur (atomares Lock, Lock-TTL, Gate-Check, Loopback-Spawn, WP-Cron-Scheduling) wohnt in `includes/class-sbu-queue-engine.php`. Konstruktor bekommt Cron-Key-Provider und Adaptive-Limits-Provider als Callables. Tick-Work, Crash-Detection und Upload/Restore-State bleiben vorerst in `SBU_Plugin`.
+- **ARCH-001 Schritte 4 + 5 verschoben auf v1.0.4** — die Ajax-Controller-Extraktion (24 Handler mit tiefer Plugin-Verflechtung) und die Upload-/Restore-Flow-Trennung brauchen einen isolierten Release, damit Regressions-Risiken in produktiven Backup-Pfaden gezielt reviewbar bleiben.
+
+### Sicherheit
+
+- **Cron-Key-Transport gehärtet** — Header-First-Reihenfolge ist jetzt auch im Loopback-Pfad durchgezogen; POST-Body als Transport gilt damit intern als deprecated.
+- **Brute-Force-Signal im Protokoll** — ein Angreifer, der mit zufälligen Schlüsseln gegen den `sbu_cron_ping`-Endpoint hämmert, hinterlässt nach fünf Versuchen eine sichtbare `WARNUNG`-Zeile im Aktivitätsprotokoll, statt stumm 403s zu produzieren.
+
+### Tests
+
+92 PHPUnit-Tests / 263 Assertions — alle grün. PHPCS (WordPress-Standard) und PHPStan (Level 5) sauber. `CrashDetectionGateTest` testet `tick_is_gated()` jetzt direkt auf `SBU_Queue_Engine`, die Crash-Detection bleibt auf `SBU_Plugin`.
+
 ## [1.0.2] — 2026-04-19
 
 Audit-Umsetzung: Datenschutz, Wartbarkeit, CI-Schärfe.

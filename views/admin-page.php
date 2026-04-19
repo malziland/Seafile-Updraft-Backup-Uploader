@@ -3,7 +3,7 @@
  * Admin page template for the Seafile Updraft Backup Uploader settings screen.
  *
  * Rendered from SBU_Plugin::render_page(). The caller supplies:
- *  - $this     (SBU_Plugin instance — used for $this->field() and $this->format_activity_log())
+ *  - $this     (SBU_Plugin instance — used for $this->field() and $this->activity_logger->format())
  *  - $s        (settings array from get_settings())
  *  - $dots     (unicode placeholder shown when a password is already stored)
  *  - $activity (activity log string from SBU_ACTIVITY option)
@@ -270,7 +270,7 @@ defined( 'ABSPATH' ) || exit;
 					</div>
 				</div>
 				<?php if ( $activity ) : ?>
-					<div class="sbu-al" id="alc"><?php echo $this->format_activity_log( $activity ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- format_activity_log returns pre-escaped HTML with span-wrapped log lines. ?></div>
+					<div class="sbu-al" id="alc"><?php echo $this->activity_logger->format( $activity ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- format() returns pre-escaped HTML with span-wrapped log lines. ?></div>
 				<?php else : ?>
 					<div class="sbu-al" id="alc"><span class="dim"><?php esc_html_e( 'Noch keine Aktivität aufgezeichnet.', 'seafile-updraft-backup-uploader' ); ?></span></div>
 				<?php endif; ?>

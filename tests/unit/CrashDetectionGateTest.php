@@ -1,12 +1,17 @@
 <?php
 /**
- * Tests for SBU_Plugin::tick_is_gated() and
+ * Tests for SBU_Queue_Engine::tick_is_gated() and
  * SBU_Plugin::detect_worker_crash_and_defer().
  *
  * Together these two guards are what prevents the classic failure mode of
  * a worker silently dying (OOM, Cloudflare 524) and then every subsequent
  * loopback/cron fire wedging the same queue back to life: the gate backs
  * off, and the crash detector installs the gate.
+ *
+ * Seit ARCH-001 Schritt 3 lebt die Gate-Prüfung in SBU_Queue_Engine; die
+ * Gate-Tests rufen sie direkt dort auf, Crash-Detection-Tests bleiben auf
+ * SBU_Plugin weil detect_worker_crash_and_defer() mit Queue-Mutation und
+ * Activity-Logging an die Plugin-Klasse gekoppelt bleibt.
  */
 
 declare( strict_types = 1 );
@@ -16,19 +21,35 @@ namespace SBU\Tests\Unit;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
+use SBU_Queue_Engine;
 
 /**
- * @covers \SBU_Plugin::tick_is_gated
+ * @covers \SBU_Queue_Engine::tick_is_gated
  * @covers \SBU_Plugin::detect_worker_crash_and_defer
  */
 final class CrashDetectionGateTest extends TestCase {
 
     private SBU_Plugin $plugin;
 
+    /**
+     * Engine instance used for the gate tests. Unabhängig vom Plugin
+     * konstruiert — Cron-Key/Adaptive-Limits werden für tick_is_gated()
+     * gar nicht ausgewertet, daher reichen triviale Provider.
+     */
+    private SBU_Queue_Engine $engine;
+
     protected function setUp(): void {
         parent::setUp();
         PluginLoader::load();
         $this->plugin = new SBU_Plugin();
+        $this->engine = new SBU_Queue_Engine(
+            static function () {
+                return 'test-key';
+            },
+            static function () {
+                return array( 'tick_time' => 25 );
+            }
+        );
     }
 
     // =====================================================================
@@ -36,12 +57,12 @@ final class CrashDetectionGateTest extends TestCase {
     // =====================================================================
 
     public function test_gate_returns_false_when_no_queue(): void {
-        $this->assertFalse( $this->callPrivate( $this->plugin, 'tick_is_gated' ) );
+        $this->assertFalse( $this->engine->tick_is_gated() );
     }
 
     public function test_gate_returns_false_when_no_gate_field(): void {
         $this->options[ SBU_QUEUE ] = [ 'status' => 'uploading' ];
-        $this->assertFalse( $this->callPrivate( $this->plugin, 'tick_is_gated' ) );
+        $this->assertFalse( $this->engine->tick_is_gated() );
     }
 
     public function test_gate_returns_false_when_gate_is_in_the_past(): void {
@@ -49,7 +70,7 @@ final class CrashDetectionGateTest extends TestCase {
             'status'               => 'uploading',
             'next_allowed_tick_ts' => time() - 1,
         ];
-        $this->assertFalse( $this->callPrivate( $this->plugin, 'tick_is_gated' ) );
+        $this->assertFalse( $this->engine->tick_is_gated() );
     }
 
     public function test_gate_returns_true_when_gate_is_in_the_future(): void {
@@ -57,7 +78,7 @@ final class CrashDetectionGateTest extends TestCase {
             'status'               => 'uploading',
             'next_allowed_tick_ts' => time() + 300,
         ];
-        $this->assertTrue( $this->callPrivate( $this->plugin, 'tick_is_gated' ) );
+        $this->assertTrue( $this->engine->tick_is_gated() );
     }
 
     // =====================================================================

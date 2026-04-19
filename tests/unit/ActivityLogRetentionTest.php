@@ -4,6 +4,10 @@
  * older than the configured window are dropped, that disabled retention
  * passes everything through, and that lines without a recognizable
  * timestamp prefix are preserved (never lose data on format surprise).
+ *
+ * Nach ARCH-001 Schritt 1 leben die Retention-Methoden in SBU_Activity_Log;
+ * die Tests injizieren den Settings-Provider direkt, damit sie ohne volle
+ * Plugin-Instanzierung laufen (schneller, isoliert).
  */
 
 declare( strict_types = 1 );
@@ -13,13 +17,13 @@ namespace SBU\Tests\Unit;
 use Brain\Monkey\Functions;
 use DateTime;
 use DateTimeZone;
+use SBU_Activity_Log;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
-use SBU_Plugin;
 
 /**
- * @covers \SBU_Plugin::prune_activity_log_lines
- * @covers \SBU_Plugin::get_activity_retention_days
+ * @covers \SBU_Activity_Log::prune_lines
+ * @covers \SBU_Activity_Log::get_retention_days
  */
 final class ActivityLogRetentionTest extends TestCase {
 
@@ -28,6 +32,12 @@ final class ActivityLogRetentionTest extends TestCase {
         PluginLoader::load();
         Functions\when( 'wp_timezone' )->alias( static function () {
             return new DateTimeZone( 'UTC' );
+        } );
+    }
+
+    private function makeLogger( array $settings = array() ): SBU_Activity_Log {
+        return new SBU_Activity_Log( static function () use ( $settings ) {
+            return $settings;
         } );
     }
 
@@ -43,42 +53,37 @@ final class ActivityLogRetentionTest extends TestCase {
             '[' . $old_str . '] UPLOAD: alt, fällt raus',
         );
 
-        $plugin = new SBU_Plugin();
-        $kept   = $this->callPrivate( $plugin, 'prune_activity_log_lines', array( $lines, 30 ) );
+        $kept = $this->makeLogger()->prune_lines( $lines, 30 );
 
         $this->assertCount( 1, $kept );
         $this->assertStringContainsString( 'frisch', $kept[0] );
     }
 
     public function test_prune_with_zero_days_returns_input_unchanged(): void {
-        $plugin = new SBU_Plugin();
-        $lines  = array( '[01.01.2020 00:00:00] UPLOAD: uralt', '[01.01.2020 00:00:01] UPLOAD: genauso uralt' );
+        $lines = array( '[01.01.2020 00:00:00] UPLOAD: uralt', '[01.01.2020 00:00:01] UPLOAD: genauso uralt' );
 
-        $kept = $this->callPrivate( $plugin, 'prune_activity_log_lines', array( $lines, 0 ) );
+        $kept = $this->makeLogger()->prune_lines( $lines, 0 );
 
         $this->assertSame( $lines, $kept );
     }
 
     public function test_prune_preserves_lines_without_timestamp_prefix(): void {
-        $plugin = new SBU_Plugin();
-        $lines  = array( '', 'Freitext-Zeile ohne Prefix', '[nicht-parsebar] UPLOAD: Sonderfall' );
+        $lines = array( '', 'Freitext-Zeile ohne Prefix', '[nicht-parsebar] UPLOAD: Sonderfall' );
 
-        $kept = $this->callPrivate( $plugin, 'prune_activity_log_lines', array( $lines, 30 ) );
+        $kept = $this->makeLogger()->prune_lines( $lines, 30 );
 
         $this->assertSame( $lines, $kept, 'Unrecognized lines must pass through — never lose data on format surprise.' );
     }
 
-    public function test_get_activity_retention_days_clamps_panic_inputs_to_seven(): void {
-        $this->options[ SBU_OPT ] = array( 'activity_log_retention_days' => 3 );
-        $plugin                   = new SBU_Plugin();
+    public function test_get_retention_days_clamps_panic_inputs_to_seven(): void {
+        $logger = $this->makeLogger( array( 'activity_log_retention_days' => 3 ) );
 
-        $this->assertSame( 7, $this->callPrivate( $plugin, 'get_activity_retention_days' ) );
+        $this->assertSame( 7, $logger->get_retention_days() );
     }
 
-    public function test_get_activity_retention_days_honors_zero_as_disabled(): void {
-        $this->options[ SBU_OPT ] = array( 'activity_log_retention_days' => 0 );
-        $plugin                   = new SBU_Plugin();
+    public function test_get_retention_days_honors_zero_as_disabled(): void {
+        $logger = $this->makeLogger( array( 'activity_log_retention_days' => 0 ) );
 
-        $this->assertSame( 0, $this->callPrivate( $plugin, 'get_activity_retention_days' ) );
+        $this->assertSame( 0, $logger->get_retention_days() );
     }
 }

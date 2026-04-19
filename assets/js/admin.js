@@ -109,7 +109,11 @@
         'dismiss-restore-banner': function(){ window.sbuDismissRestoreBanner(); },
         'export-log':             function(){ window.sbuExportLog(); },
         'export-log-anon':        function(){ window.sbuExportLogAnon(); },
-        'clear-log':              function(){ window.sbuClearLog(); }
+        'clear-log':              function(){ window.sbuClearLog(); },
+        'toggle-files':           function(btn){ window.sbuToggle(btn.getAttribute('data-target'), btn); },
+        'restore-all':            function(btn){ window.sDlAll(btn.getAttribute('data-dir')); },
+        'delete-backup':          function(btn){ window.sDe(btn.getAttribute('data-dir')); },
+        'download-file':          function(btn){ window.sDl(btn.getAttribute('data-dir'), btn.getAttribute('data-file')); }
     };
     var sbuRoot = document.querySelector('.wrap.sbu') || document;
     sbuRoot.addEventListener('click', function(e){

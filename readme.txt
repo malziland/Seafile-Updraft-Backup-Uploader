@@ -4,7 +4,7 @@ Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -94,6 +94,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 
 == Changelog ==
 
+= 1.0.3 =
+* Zweiter Audit-Durchgang: Brute-Force-Schutz für den internen Cron-Schlüssel (WARNUNG ab 5 Fehlversuchen/h), Cron-Key jetzt im `X-SBU-Cron-Key`-Header statt im POST-Body, Zero-Traffic-Backstop für Log-Retention auf idle Admin-Sites. Status-Pillen in der Backup-Liste zentriert (kein Treppenversatz mehr). Refactoring ARCH-001 Schritte 1–3: `SBU_Activity_Log`, `SBU_Mail_Notifier`, `SBU_Queue_Engine` als eigene Services ausgelagert. Schritte 4–5 folgen in v1.0.4. 92 Tests / 263 Assertions, alle grün.
+
 = 1.0.2 =
 * Audit-Umsetzung (Datenschutz, Wartbarkeit, CI): Zeit-basierte Aufbewahrung des Aktivitätsprotokolls (Default 30 Tage, 7–365 Tage oder 0 = deaktiviert), Warn-Header im unmaskierten Log-Export, Inline-onclick aus dem Admin entfernt (Event-Delegation via `data-sbu-action`), CI-Gates (PHPCS, PHPStan) brechen den Build jetzt bei Fehlern ab. 92 Tests / 263 Assertions, alle grün.
 
@@ -104,6 +107,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.3 =
+Sicherheits- und Architektur-Update: Cron-Schlüssel jetzt im Header (nicht mehr im Body), Brute-Force-Warnung im Aktivitätsprotokoll, UI-Treppenversatz bei Backup-Status-Pillen behoben. Drei Services aus der God-Class ausgelagert — Verhalten unverändert. Keine Migration nötig.
 
 = 1.0.2 =
 Datenschutz-Update: Aktivitätsprotokoll wird automatisch nach 30 Tagen aufgeräumt (konfigurierbar). Log-Export mit Warnhinweis auf identifizierende Daten. Keine Migration nötig.
