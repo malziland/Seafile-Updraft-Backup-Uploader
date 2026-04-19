@@ -8,13 +8,12 @@ declare( strict_types = 1 );
 namespace SBU\Tests\Unit;
 
 use Brain\Monkey\Functions;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 
-/**
- * @covers \SBU_Plugin::get_cron_key
- */
+#[CoversMethod(SBU_Plugin::class, 'get_cron_key')]
 final class CronKeyTest extends TestCase {
 
     protected function setUp(): void {

@@ -3,8 +3,8 @@ Contributors: malziland
 Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
-Requires PHP: 7.4
-Stable tag: 1.0.4
+Requires PHP: 8.2
+Stable tag: 1.0.5
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -40,7 +40,7 @@ Dieses Plugin löst das Problem mit der Upload-API, die die Seafile-Weboberfläc
 = Anforderungen =
 
 * WordPress 6.0+
-* PHP 7.4+
+* PHP 8.2+
 * UpdraftPlus (Free oder Premium)
 * Ein Seafile-Server (self-hosted oder Cloud)
 
@@ -92,7 +92,18 @@ Das Plugin prüft pro Backup-Set, wie viele der Seafile-Dateien bereits lokal vo
 = Muss ich externen Cron einrichten? =
 Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenständig — keine Besucher nötig, kein externer Cron-Trigger. Für Umgebungen, die Loopbacks komplett blockieren (spezielle Firewall-Regeln, die WordPress sich selbst nicht aufrufen lassen), gibt es einen optionalen schlüsselgeschützten Cron-Endpoint. Die URL mit Crontab-Beispiel steht direkt im Admin unter „Erweitert: Optionaler externer Heartbeat".
 
+== Screenshots ==
+
+1. Feature-Überblick (Header-Grafik).
+2. Einstellungsseite mit Seafile-Verbindung, Backup-Browser und Aktivitätsprotokoll (Demo-Daten, Library `WordPress-Backups`).
+3. WordPress-Dashboard-Widget mit letztem Backup-Status.
+
 == Changelog ==
+
+= 1.0.5 =
+* **Breaking:** PHP-Mindestanforderung von 7.4 auf **8.2** angehoben. Composer-Constraint und Plugin-Header gleichzeitig aktualisiert — WordPress blockiert die Aktivierung auf älteren PHP-Versionen. Die unterstützte Matrix ist jetzt PHP 8.2 / 8.3 / 8.4 (CI-getestet).
+* **Testsuite:** PHPUnit 9 → 11. Alle Test-Dateien von `@covers`-Docblocks auf PHP-8-Attribute (`#[CoversClass]` / `#[CoversMethod]`) migriert — null Deprecations mehr. Neue Tests für `SBU_Seafile_API` (17 HTTP-gemockte Fälle: Token-Cache, Library-Resolve, Upload-/Download-Link, Directory-Ops) und für den Log-Export-Sanitizer (12 Fälle: Host-, UUID-, Ordner-, E-Mail-, IP-, Nonce-Maskierung). Gesamt: **121 Tests / 333 Assertions** (vorher 92 / 263).
+* **Dokumentation:** README, ARCHITECTURE und CONTRIBUTING auf den aktuellen Code-Stand gezogen — Modul-Boundaries-Tabelle, Test-Surface-Tabelle, reproduzierbarer Release-Workflow (rsync + zip), explizite Quality-Gate-Befehle. Neue Screenshots für Einstellungsseite und Dashboard-Widget mit Demo-Daten.
 
 = 1.0.4 =
 * ARCH-001 abgeschlossen: Schritt 4 zieht alle 24 Ajax-Handler in `SBU_Admin_Ajax` (Trait), Schritt 5 zerlegt Upload- und Restore-Flow in `SBU_Upload_Flow` bzw. `SBU_Restore_Flow` (Traits). Trait-Kompositon hält alle Private-Zugriffe intakt — null Visibility-Promotion. `SBU_Plugin` schrumpft von 4201 auf ~1100 Zeilen (−74 %). `SBU_Queue_Engine::tick_is_gated()` als `@phpstan-impure` markiert. Reines Refactoring, Verhalten 1:1. 92 Tests / 263 Assertions, alle grün.
@@ -110,6 +121,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.5 =
+Breaking: PHP-Mindestanforderung 8.2. Auf älteren PHP-Versionen verweigert WordPress die Aktivierung. Vor dem Update die PHP-Version des Hosts prüfen. Danach keine manuelle Migration nötig. Intern: PHPUnit 11, erweiterte Testsuite (121 Tests / 333 Assertions), professionalisierte Dokumentation.
 
 = 1.0.4 =
 Abschluss des ARCH-001-Refactorings: Ajax-Handler, Upload-Flow und Restore-Flow sind jetzt als Traits ausgelagert. `SBU_Plugin` ist von 4201 auf ~1100 Zeilen runter (−74 %). Reine Umstrukturierung, Verhalten unverändert. Keine Migration nötig.

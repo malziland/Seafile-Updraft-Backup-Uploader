@@ -17,14 +17,13 @@ namespace SBU\Tests\Unit;
 use Brain\Monkey\Functions;
 use DateTime;
 use DateTimeZone;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU_Activity_Log;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 
-/**
- * @covers \SBU_Activity_Log::prune_lines
- * @covers \SBU_Activity_Log::get_retention_days
- */
+#[CoversMethod(SBU_Activity_Log::class, 'prune_lines')]
+#[CoversMethod(SBU_Activity_Log::class, 'get_retention_days')]
 final class ActivityLogRetentionTest extends TestCase {
 
     protected function setUp(): void {

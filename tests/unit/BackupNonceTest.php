@@ -8,13 +8,12 @@ declare( strict_types = 1 );
 
 namespace SBU\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 
-/**
- * @covers \SBU_Plugin::extract_backup_nonce
- */
+#[CoversMethod(SBU_Plugin::class, 'extract_backup_nonce')]
 final class BackupNonceTest extends TestCase {
 
     protected function setUp(): void {

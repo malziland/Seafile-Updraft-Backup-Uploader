@@ -10,6 +10,9 @@ WordPress-Plugin: Lädt UpdraftPlus-Backups automatisch per Seafile API mit Chun
 
 ![Plugin-Header mit Feature-Übersicht](assets/screenshot-header.png)
 ![Einstellungen, Backup-Browser und Aktivitätsprotokoll](assets/screenshot-dashboard.png)
+![Dashboard-Widget mit letztem Backup-Status](assets/screenshot-widget.png)
+
+*Die Screenshots zeigen das Plugin mit Demo-Daten (`seafile.example.com`, Library `WordPress-Backups`).*
 
 ## Was ist das?
 
@@ -38,7 +41,7 @@ UpdraftPlus erstellt Backups — dieses Plugin übernimmt den Upload auf deinen 
 ## Voraussetzungen
 
 - WordPress 6.0+
-- PHP 7.4+ mit OpenSSL-Erweiterung
+- PHP 8.2+ mit OpenSSL-Erweiterung (PHP 8.2, 8.3 und 8.4 werden per CI getestet)
 - [UpdraftPlus](https://updraftplus.com/) (Free oder Premium)
 - Seafile Server mit API-Zugang
 
@@ -77,30 +80,61 @@ Das Plugin übernimmt den Upload automatisch nach jedem UpdraftPlus-Backup.
 seafile-updraft-backup-uploader/
 ├── seafile-updraft-backup-uploader.php   — Bootstrap (Konstanten, Autoload, Activation-Hooks)
 ├── includes/
-│   ├── class-sbu-plugin.php              — Hauptlogik (Admin, AJAX, Queue-Engine)
+│   ├── class-sbu-plugin.php              — Haupt-Controller: Admin-Init, Settings, Lifecycle
+│   ├── class-sbu-queue-engine.php        — Tick-Gate, Queue-Lock, Stale-Lock-Recovery
+│   ├── class-sbu-activity-log.php        — Aktivitätsprotokoll (Ring-Buffer, Retention)
+│   ├── class-sbu-mail-notifier.php       — E-Mail-Benachrichtigungen (Erfolg/Fehler)
+│   ├── class-sbu-seafile-api.php         — Stateless REST-Client für Seafile
 │   ├── class-sbu-crypto.php              — AES-256-CBC Password-Encryption
-│   └── class-sbu-seafile-api.php         — Stateless REST-Client für Seafile
+│   ├── trait-sbu-upload-flow.php         — Upload-Queue, Chunked-Upload, Retry/Backoff
+│   ├── trait-sbu-restore-flow.php        — Restore-Queue, paralleler Range-Download
+│   └── trait-sbu-admin-ajax.php          — 20 AJAX-Handler (Admin) + 1 öffentlicher Cron-Ping
 ├── views/
 │   └── admin-page.php                    — Template der Einstellungsseite
 ├── assets/
 │   ├── css/admin.css                     — Admin-Styles
 │   └── js/admin.js                       — Admin-UI-Script
-├── languages/                            — Übersetzungsdateien (DE/EN)
-├── tests/                                — PHPUnit + Brain\Monkey Test-Suite
+├── languages/                            — Übersetzungsdateien (DE/EN, .pot-Template)
+├── tests/                                — PHPUnit 11 + Brain\Monkey Test-Suite (121 Tests)
+├── scripts/                              — regen-pot.sh, check-i18n.sh
 ├── readme.txt                            — WordPress.org Plugin-Header
 ├── LICENSE                               — MIT
 ├── ARCHITECTURE.md                       — State-Machine, Queue, Lock-Modell
 ├── CHANGELOG.md                          — Versionshistorie
-├── CONTRIBUTING.md                       — Beitragsrichtlinien
-└── SECURITY.md                           — Sicherheitsrichtlinie
+├── CONTRIBUTING.md                       — Beitragsrichtlinien, Dev-Setup, Release-Prozess
+└── SECURITY.md                           — Threat-Model, Disclosure-Process
 ```
 
 **Kernkomponenten:**
-- `SBU_Crypto` — AES-256-CBC mit zufälligem IV pro Vorgang, Legacy-IV-Migration
-- `SBU_Seafile_API` — Auth, Library-Resolve, Upload-Link, Streaming-Download, Directory-Ops
-- `SBU_Plugin` — Admin-Seite, 20 AJAX-Handler (Nonce + `manage_options`) + 1 öffentlicher Cron-Endpoint (per-site Secret-Key, `hash_equals`), Queue-Engine mit Chunked-Upload, Pause/Resume, Crash-Detection, Retry-Backoff, Aktivitätsprotokoll
+- `SBU_Plugin` — Haupt-Controller. Bindet die drei Traits ein und orchestriert Admin-Init, Einstellungen, Queue-Bootstrap sowie Crash-Detection.
+- `SBU_Queue_Engine` — Tick-Gate (`next_allowed_tick_ts`-Logik), `add_option`-basiertes Queue-Lock mit Stale-Lock-Recovery.
+- `SBU_Activity_Log` — Aktivitätsprotokoll als gekappter Ring-Buffer mit konfigurierbarer Retention und täglichem Cron-Prune.
+- `SBU_Mail_Notifier` — E-Mail-Benachrichtigungen für Erfolg / Fehler / nur Fehler; keine Templates im Haupt-Controller.
+- `SBU_Seafile_API` — Stateless REST-Client: Auth-Token (mit Transient-Cache), Library-Resolve, Upload-/Download-Link, paralleler `curl_multi`-Range-Download, Directory-Ops.
+- `SBU_Crypto` — AES-256-CBC mit zufälligem IV pro Vorgang. Legacy-IV-Migration erkennt alte Formate und re-verschlüsselt beim nächsten Save.
+- `SBU_Upload_Flow` / `SBU_Restore_Flow` / `SBU_Admin_Ajax_Controller` — Traits, die die Upload-Queue-Mechanik, Restore-Queue-Mechanik und AJAX-Endpunkte in `SBU_Plugin` einhängen.
+
+**Öffentliche Oberfläche:** 20 Admin-AJAX-Endpunkte (alle mit `manage_options` + Nonce) und genau **ein** öffentlicher Endpunkt `sbu_cron_ping` (per-site 32-char Secret-Key, `hash_equals()`-Vergleich).
 
 Die Queue-Logik, das Locking-Modell und die State-Machine (uploading ↔ paused, → aborted/error/done) sind in [ARCHITECTURE.md](ARCHITECTURE.md) dokumentiert.
+
+## Entwicklung und Tests
+
+```bash
+git clone https://github.com/malziland/Seafile-Updraft-Backup-Uploader.git
+cd Seafile-Updraft-Backup-Uploader
+composer install                                 # PHP 8.2+ erforderlich
+
+./vendor/bin/phpunit                             # 121 Tests / 333 Assertions
+./vendor/bin/phpcs --extensions=php \            # WordPress Coding Standards
+    --ignore=vendor,languages,assets,tests,.github,scripts .
+./vendor/bin/phpstan analyse --level=5 \         # statische Analyse
+    --memory-limit=1G --no-progress
+```
+
+Die CI-Pipeline (`.github/workflows/ci.yml`) fährt alle drei Gates auf der PHP-Matrix 8.2 / 8.3 / 8.4 und prüft zusätzlich per Gitleaks auf eingecheckte Geheimnisse. Jeder Push auf `main`, `feature/**` und `fix/**` sowie jeder Pull Request lösen die Pipeline aus — rotes CI blockt das Release.
+
+Der Release-Prozess (Version-Bump → ZIP → Commit → Tag → GitHub-Release mit ZIP-Asset) ist in [CONTRIBUTING.md](CONTRIBUTING.md) beschrieben.
 
 ## Sicherheit
 

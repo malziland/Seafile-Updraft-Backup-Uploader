@@ -4,6 +4,37 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.5] — 2026-04-19
+
+Breaking-Change-Release: PHP-Mindestanforderung auf 8.2 angehoben. Testsuite auf PHPUnit 11 gehoben und um zwei neue Abdeckungs-Schwerpunkte erweitert. Dokumentation (README, ARCHITECTURE, CONTRIBUTING) auf den aktuellen Code-Stand gezogen.
+
+### Breaking
+
+- **PHP-Mindestanforderung 7.4 → 8.2.** Plugin-Header (`Requires PHP`), `composer.json` (`"php": ">=8.2"`) und `readme.txt` (`Requires PHP`) jetzt konsistent auf 8.2. WordPress blockiert die Aktivierung auf älteren PHP-Versionen mit eigenem Hinweis. Supporte PHP-Matrix: **8.2 / 8.3 / 8.4** (CI-getestet auf allen drei). Hintergrund: PHPUnit 11 verlangt PHP ≥ 8.2, und das bisherige 7.4-Minimum brachte PHP-8-Syntax-Features (readonly, never, match, first-class-callable) sowieso schon außer Reichweite für die getestete Oberfläche.
+
+### Geändert
+
+- **PHPUnit 9.6 → 11.5.** Alle 12 bestehenden Test-Dateien von `@covers`-Docblocks auf PHP-8-Attribute (`#[CoversClass]`, `#[CoversMethod]`) migriert — PHPUnit 11 meldet dafür sonst Deprecations, die sich in einem späteren Major zu Fehlern entwickeln. Null Deprecations in der jetzigen Suite.
+- **CI-Matrix** (`.github/workflows/ci.yml`): PHP-Versionen auf 8.2 / 8.3 / 8.4 umgestellt, Composer-Constraint folgt der Matrix, Gitleaks-Job unverändert.
+- **PHPStan-Config** (`phpstan.neon.dist`): Projekt-weite `@phpstan-impure`-Annotationen eingepflegt, wo neue Trait-Komposition redundante Reads suggerierte.
+- **PHPCS-Config** (`phpcs.xml.dist`): Exklusionen auf die post-Refactor-Verzeichnisstruktur angepasst.
+
+### Hinzugefügt
+
+- **`tests/unit/SeafileApiTest.php`** — 17 HTTP-gemockte Tests für `SBU_Seafile_API`. Deckt Token-Caching (inkl. `force`-Refresh und Auth-Failure-Invalidation), Library-Resolve, Upload-Link-Ausstellung, Download-Link (mit `reuse=1`-Check), Directory-Create/List/Delete. Benutzt einen lokalen `httpResponse()`-Helfer und stubt `wp_remote_*` + Retrieve-Helfer + Transient-Store.
+- **`tests/unit/LogSanitizerTest.php`** — 12 Tests für den anonymisierten Log-Export (`ajax_export_log_anon`). Prüft jede Maskierungs-Regel einzeln (Host, UUID, Ordner, E-Mail, IP, Nonce-Suffix, Unknown-E-Mail) plus einen End-zu-End-Leak-Check über einen synthetischen Log mit realistischen PII-Mustern.
+- **Neue Screenshots** für `readme.txt` und `README.md`: `assets/screenshot-dashboard.png` (Einstellungsseite inkl. Backup-Browser und Aktivitätsprotokoll, Demo-Daten) und `assets/screenshot-widget.png` (WordPress-Dashboard-Widget mit letztem Backup-Status).
+
+### Dokumentation
+
+- **`README.md`** — PHP-Requirement aktualisiert, Architektur-Tree auf den jetzigen Stand (alle Traits und extrahierten Services sichtbar), Kernkomponenten-Abschnitt pro Klasse / Trait, reproduzierbare Test-Kommandos, ein Block für den Release-Workflow.
+- **`ARCHITECTURE.md`** — neue „Module boundaries"-Tabelle (wer wohnt wo und warum), erweiterter „Activity log"-Abschnitt (Retention, `SBU_Activity_Log`-Extraktion, `LogSanitizerTest`), neuer „Notifications"-Abschnitt für `SBU_Mail_Notifier`, neue „Test surface"-Tabelle mit 13 Zeilen (121 Tests / 333 Assertions).
+- **`CONTRIBUTING.md`** — vollständig überarbeitet: Dev-Setup, drei Quality-Gates mit lauffähigen Kommandos, vollständiger Release-Workflow inklusive `rsync`+`zip`-Rezept für das WP-Upload-konforme Archiv (keine zusätzlichen Build-Skripte erforderlich), i18n-Regeln.
+
+### Tests
+
+**121 Tests / 333 Assertions** (vorher 92 / 263). PHPCS (WordPress-Standard, Plugin-Source), PHPStan Level 5 und PHPUnit 11 grün auf PHP 8.2 / 8.3 / 8.4.
+
 ## [1.0.4] — 2026-04-19
 
 ARCH-001 abgeschlossen: die beiden letzten Monolith-Fragmente sind raus aus der God-Class. Reine Umstrukturierung — Verhalten 1:1, 92 Tests / 263 Assertions grün.

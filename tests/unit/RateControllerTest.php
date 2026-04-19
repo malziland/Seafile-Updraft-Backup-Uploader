@@ -15,13 +15,12 @@ declare( strict_types = 1 );
 
 namespace SBU\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 
-/**
- * @covers \SBU_Plugin::update_rate_state
- */
+#[CoversMethod(SBU_Plugin::class, 'update_rate_state')]
 final class RateControllerTest extends TestCase {
 
     private const CEILINGS = [ 'chunk_mb_max' => 20, 'parallel_max' => 4 ];

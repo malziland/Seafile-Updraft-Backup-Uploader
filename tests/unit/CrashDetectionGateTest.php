@@ -18,15 +18,14 @@ declare( strict_types = 1 );
 
 namespace SBU\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 use SBU_Queue_Engine;
 
-/**
- * @covers \SBU_Queue_Engine::tick_is_gated
- * @covers \SBU_Plugin::detect_worker_crash_and_defer
- */
+#[CoversMethod(SBU_Queue_Engine::class, 'tick_is_gated')]
+#[CoversMethod(SBU_Plugin::class, 'detect_worker_crash_and_defer')]
 final class CrashDetectionGateTest extends TestCase {
 
     private SBU_Plugin $plugin;

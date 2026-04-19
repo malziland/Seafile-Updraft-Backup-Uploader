@@ -8,14 +8,39 @@ forward. It's aimed at contributors — users don't need to read this.
 
 ```
 seafile-updraft-backup-uploader.php   bootstrap: constants, autoload, activation
-includes/class-sbu-crypto.php         AES-256-CBC (random IV, legacy IV migration)
-includes/class-sbu-seafile-api.php    stateless Seafile REST client
-includes/class-sbu-plugin.php         admin, AJAX, queue engine, retention, logs
+includes/
+  class-sbu-plugin.php                main controller: admin init, settings,
+                                      lifecycle (composes the three traits below)
+  class-sbu-queue-engine.php          tick gate, queue lock, stale-lock recovery
+  class-sbu-activity-log.php          capped ring-buffer activity log + retention
+  class-sbu-mail-notifier.php         success / failure e-mail notifications
+  class-sbu-seafile-api.php           stateless Seafile REST client
+  class-sbu-crypto.php                AES-256-CBC (random IV, legacy IV migration)
+  trait-sbu-upload-flow.php           upload queue, chunked upload, retry/backoff
+  trait-sbu-restore-flow.php          restore queue, parallel Range download
+  trait-sbu-admin-ajax.php            20 admin AJAX handlers + 1 public cron-ping
 views/admin-page.php                  settings page template
 assets/js/admin.js                    admin UI (progress polling, pause/resume)
 assets/css/admin.css                  admin UI styles
-tests/                                PHPUnit + Brain\Monkey
+tests/                                PHPUnit 11 + Brain\Monkey (121 tests)
 ```
+
+## Module boundaries
+
+The upload/restore flow was extracted out of `SBU_Plugin` into dedicated units
+in 1.0.3 and 1.0.4. What stays where, and why:
+
+| Module | Responsibility | Why it lives here |
+|---|---|---|
+| `SBU_Plugin` | Settings, activation hooks, admin-init wiring, crash detection entry point | The class is the WordPress-facing surface; hooks register against `$this->`-methods, so tenant-specific wiring must live here. |
+| `SBU_Queue_Engine` | `tick_is_gated()`, `acquire_queue_lock()` / `release_queue_lock()`, stale-lock TTL | Pure queue-protocol logic. No WordPress options beyond the three it owns; unit-testable without a Plugin instance. |
+| `SBU_Activity_Log` | Append, read, prune, daily retention cron | The ring buffer and its retention pruning have no dependency on the uploader; isolating them makes the log testable and re-usable. |
+| `SBU_Mail_Notifier` | Success / failure / filtered notifications | Moves e-mail templating out of the tick-hot path. |
+| `SBU_Seafile_API` | HTTP client (no state) | Stateless by contract — keeps the transport separate from the orchestration. |
+| `SBU_Crypto` | AES-256-CBC + legacy IV migration | One-shot helper; lives alone so the key-derivation contract has a single owner. |
+| `SBU_Upload_Flow` (trait) | `process_queue_tick()`, chunk loop, `safe_queue_update()`, `upload_one_chunk()` | Trait rather than a collaborator so it can `$this->activity_logger` / `$this->get_settings()` cheaply; lives next to `SBU_Plugin` at runtime but is maintained as its own file. |
+| `SBU_Restore_Flow` (trait) | `process_restore_tick()`, parallel-range download pump | Same rationale as the upload flow — mirrors its structure and error handling. |
+| `SBU_Admin_Ajax_Controller` (trait) | 20 `ajax_*` endpoints, Nonce/cap gate, sanitizers | Lives in a trait so every AJAX entry point goes through the same `verify_ajax_request()` helper without a second class hop. |
 
 ## Queue state machine
 
@@ -183,15 +208,38 @@ bit-for-bit equality. It doubles bandwidth, which is why it's opt-in.
 
 ## Activity log
 
-A capped ring buffer (`SBU_ACTIVITY_MAX = 200`) stored in `sbu_activity_log`.
-Every non-routine event appends an entry: upload start / success /
-failure / retry, crash detection, pause / resume / abort, SHA1 mismatch,
-slow chunks, duplicate detection, retention deletions, restore events,
-settings changes.
+Implemented by `SBU_Activity_Log` (extracted from `SBU_Plugin` in 1.0.3). A
+capped ring buffer (`SBU_ACTIVITY_MAX = 200`) stored in the
+`sbu_activity_log` option. Every non-routine event appends an entry: upload
+start / success / failure / retry, crash detection, pause / resume / abort,
+SHA1 mismatch, slow chunks, duplicate detection, retention deletions,
+restore events, settings changes.
 
-The log is user-visible (Admin → Seafile Backup → Aktivitätsprotokoll)
-and exportable as plain text. It is **the** debugging surface for this
-plugin — logs go there first, PHP's error_log second.
+The log is user-visible (Admin → Seafile Backup → Aktivitätsprotokoll) and
+exportable as plain text. A second export path, `ajax_export_log_anon()`,
+produces an anonymized version suitable for public support threads — the
+configured Seafile host, library UUID, target folder, user e-mail, IPv4
+addresses, any other UUID-shaped token and the UpdraftPlus nonce embedded
+in backup filenames are all replaced with `[SERVER]`, `[LIB]`, `[PATH]`,
+`[USER]`, `[IP]`, `[LIB]`, `[NONCE]` respectively. The masking rules are
+covered by `tests/unit/LogSanitizerTest.php`.
+
+**Retention.** The log self-prunes daily via the cron hook
+`SBU_ACTIVITY_RETENTION_CRON_HOOK`. The retention window (`0` = disabled,
+otherwise 7–365 days) is an admin setting. Lines without a recognizable
+timestamp prefix are always preserved — never lose data on format surprise.
+
+It is **the** debugging surface for this plugin — logs go there first,
+PHP's `error_log` second.
+
+## Notifications
+
+`SBU_Mail_Notifier` (also extracted in 1.0.3) renders and sends the
+post-upload mail. The `notify` setting gates it: `never`, `error` (only if
+the upload had any failure), or `always`. Output is plain text so spam
+filters don't mangle it, and the subject carries the outcome
+(`[Backup OK]` / `[Backup mit Fehlern]`) so inbox rules can triage
+automatically.
 
 ## Security boundaries
 
@@ -212,3 +260,37 @@ plugin — logs go there first, PHP's error_log second.
   there because it's a request to the same host.
 
 See [SECURITY.md](SECURITY.md) for the threat model and disclosure process.
+
+## Test surface
+
+Unit tests live in `tests/unit/` and run under PHPUnit 11 + Brain\Monkey.
+The bootstrap (`tests/bootstrap.php`) pre-defines the minimum WordPress
+constants and a `WP_Error` shim so the plugin source loads without a WP
+install. `tests/Helpers/TestCase.php` wires the Brain\Monkey setup/teardown,
+stubs `get_option` / `update_option` / `delete_option` / `add_option`
+against an in-memory array, and exposes `callPrivate()` /
+`callPrivateStatic()` helpers for reaching into encapsulated logic.
+
+What the current suite covers:
+
+| Area | Test file | Kind |
+|---|---|---|
+| Password crypto | `CryptoTest.php` | Encrypt/decrypt round-trip + legacy-IV migration |
+| Queue integrity | `SafeQueueUpdateTest.php` | Mid-tick writes never clobber terminal status |
+| Tick gating | `CrashDetectionGateTest.php` | Worker-crash backoff installs gate correctly |
+| Error classification | `ErrorClassificationTest.php` | Transient vs. deadline vs. client distinctions |
+| Retry / backoff | `RetryDelayTest.php`, `RateControllerTest.php` | Exponential-delay tiers, AIMD behaviour |
+| Adaptive budget | `AdaptiveLimitsTest.php` | Tick budget / chunk / parallelism scale with server limits; `compute_queue_timeout` size-based |
+| Pause / resume | `PauseResumeTest.php` | Exact-offset roundtrip invariant |
+| Verify step | `VerifyBackupTest.php` | Post-upload size-only verify matrix |
+| Filename parsing | `BackupNonceTest.php` | UpdraftPlus nonce extraction |
+| Cron key | `CronKeyTest.php` | Per-site key generation & persistence |
+| Retention | `ActivityLogRetentionTest.php` | Retention window, 0=off, format-surprise safety |
+| Seafile API | `SeafileApiTest.php` | `wp_remote_*`-mocked round-trips for auth, library, up/download, dir ops |
+| Log sanitization | `LogSanitizerTest.php` | Every masking rule, plus an end-to-end leak check |
+
+At the time of writing (PHP 8.5 runtime, PHPUnit 11.5.55) the suite reports
+**121 tests, 333 assertions**. The CI pipeline
+(`.github/workflows/ci.yml`) runs PHPUnit across PHP 8.2 / 8.3 / 8.4 and
+gates merges on PHPCS (WordPress Coding Standards), PHPStan (level 5),
+and Gitleaks.

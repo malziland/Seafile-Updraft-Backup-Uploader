@@ -8,13 +8,12 @@ declare( strict_types = 1 );
 
 namespace SBU\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Crypto;
 
-/**
- * @covers \SBU_Crypto
- */
+#[CoversClass(SBU_Crypto::class)]
 final class CryptoTest extends TestCase {
 
     protected function setUp(): void {

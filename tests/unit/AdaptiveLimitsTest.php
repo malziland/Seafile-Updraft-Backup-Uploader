@@ -10,14 +10,13 @@ declare( strict_types = 1 );
 
 namespace SBU\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 
-/**
- * @covers \SBU_Plugin::compute_adaptive_limits
- * @covers \SBU_Plugin::compute_queue_timeout
- */
+#[CoversMethod(SBU_Plugin::class, 'compute_adaptive_limits')]
+#[CoversMethod(SBU_Plugin::class, 'compute_queue_timeout')]
 final class AdaptiveLimitsTest extends TestCase {
 
     protected function setUp(): void {

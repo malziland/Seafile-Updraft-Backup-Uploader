@@ -12,15 +12,14 @@ declare( strict_types = 1 );
 
 namespace SBU\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\JsonResponse;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 
-/**
- * @covers \SBU_Plugin::ajax_pause_upload
- * @covers \SBU_Plugin::ajax_resume_upload
- */
+#[CoversMethod(SBU_Plugin::class, 'ajax_pause_upload')]
+#[CoversMethod(SBU_Plugin::class, 'ajax_resume_upload')]
 final class PauseResumeTest extends TestCase {
 
     private SBU_Plugin $plugin;

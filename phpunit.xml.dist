@@ -6,18 +6,22 @@
          cacheResult="false"
          failOnWarning="true"
          failOnRisky="true"
-         convertErrorsToExceptions="true"
-         convertNoticesToExceptions="true"
-         convertWarningsToExceptions="true">
+         beStrictAboutOutputDuringTests="true"
+         beStrictAboutChangesToGlobalState="false"
+         displayDetailsOnTestsThatTriggerWarnings="true"
+         displayDetailsOnTestsThatTriggerDeprecations="true"
+         displayDetailsOnPhpunitDeprecations="true"
+         displayDetailsOnTestsThatTriggerErrors="true"
+         displayDetailsOnTestsThatTriggerNotices="true">
     <testsuites>
         <testsuite name="unit">
             <directory>tests/unit</directory>
         </testsuite>
     </testsuites>
-    <coverage>
+    <source>
         <include>
             <file>seafile-updraft-backup-uploader.php</file>
             <directory>includes</directory>
         </include>
-    </coverage>
+    </source>
 </phpunit>

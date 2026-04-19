@@ -14,13 +14,12 @@ declare( strict_types = 1 );
 
 namespace SBU\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 
-/**
- * @covers \SBU_Plugin::compute_retry_delay
- */
+#[CoversMethod(SBU_Plugin::class, 'compute_retry_delay')]
 final class RetryDelayTest extends TestCase {
 
     protected function setUp(): void {

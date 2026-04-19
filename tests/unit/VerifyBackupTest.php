@@ -17,13 +17,12 @@ declare( strict_types = 1 );
 namespace SBU\Tests\Unit;
 
 use Brain\Monkey\Functions;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 
-/**
- * @covers \SBU_Plugin::verify_backup
- */
+#[CoversMethod(SBU_Plugin::class, 'verify_backup')]
 final class VerifyBackupTest extends TestCase {
 
     private SBU_Plugin $plugin;

@@ -26,21 +26,21 @@
  * Plugin Name: Seafile Updraft Backup Uploader
  * Plugin URI:  https://github.com/malziland/seafile-updraft-backup-uploader
  * Description: Uploads UpdraftPlus backups to Seafile via chunked API upload. Bypasses WebDAV and Cloudflare limits. Dashboard widget, email alerts, retention management.
- * Version:     1.0.4
+ * Version:     1.0.5
  * Author:      malziland - learning | training | consulting
  * Author URI:  https://malziland.at
  * License:     MIT
  * License URI: https://opensource.org/licenses/MIT
  * Text Domain: seafile-updraft-backup-uploader
  * Requires at least: 6.0
- * Requires PHP: 7.4
+ * Requires PHP: 8.2
  */
 
 defined( 'ABSPATH' ) || exit;
 
 // --- Constants ---------------------------------------------------------------
 
-define( 'SBU_VER', '1.0.4' );
+define( 'SBU_VER', '1.0.5' );
 define( 'SBU_OPT', 'sbu_settings' );
 define( 'SBU_LOG', 'sbu_log' );
 define( 'SBU_STAT', 'sbu_status' );

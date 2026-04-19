@@ -12,13 +12,12 @@ declare( strict_types = 1 );
 
 namespace SBU\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
 use SBU\Tests\Helpers\PluginLoader;
 use SBU\Tests\Helpers\TestCase;
 use SBU_Plugin;
 
-/**
- * @covers \SBU_Plugin::classify_chunk_error
- */
+#[CoversMethod(SBU_Plugin::class, 'classify_chunk_error')]
 final class ErrorClassificationTest extends TestCase {
 
     protected function setUp(): void {
