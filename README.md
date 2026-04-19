@@ -8,7 +8,6 @@
 
 WordPress-Plugin: Lädt UpdraftPlus-Backups automatisch per Seafile API mit Chunked Upload hoch. Umgeht WebDAV- und Cloudflare-Tunnel-Limits (100 MB).
 
-![Plugin-Header mit Feature-Übersicht](assets/screenshot-header.png)
 ![Einstellungen, Backup-Browser und Aktivitätsprotokoll](assets/screenshot-dashboard.png)
 ![Dashboard-Widget mit letztem Backup-Status](assets/screenshot-widget.png)
 
