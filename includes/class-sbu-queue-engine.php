@@ -102,6 +102,10 @@ final class SBU_Queue_Engine {
 	 * and WP-Cron fires can be rejected cheaply while admin-visible state
 	 * (paused, done) passes through the entry points normally.
 	 *
+	 * Reads mutable DB state (SBU_QUEUE) fresh on every call — never memoize,
+	 * the gate value shifts as ticks schedule/clear backoff windows.
+	 *
+	 * @phpstan-impure
 	 * @return bool
 	 */
 	public function tick_is_gated() {

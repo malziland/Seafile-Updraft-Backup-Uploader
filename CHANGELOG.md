@@ -4,6 +4,24 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.4] — 2026-04-19
+
+ARCH-001 abgeschlossen: die beiden letzten Monolith-Fragmente sind raus aus der God-Class. Reine Umstrukturierung — Verhalten 1:1, 92 Tests / 263 Assertions grün.
+
+### Refaktoriert
+
+- **ARCH-001 Schritt 4 — `SBU_Admin_Ajax` als Trait** — alle 24 Ajax-Handler (Verbindungstest, Upload-/Restore-Queue-Kontrolle, Backup-Liste, Download-Stream, Log-Export, Settings-Autosave, die beiden extern erreichbaren Cron-Endpoints) leben physisch in `includes/trait-sbu-admin-ajax.php`. Trait-Kompositon zur Compile-Zeit hält die Private-Zugriffe auf `verify_ajax_request`, `get_picker_credentials`, `format_progress`, `sanitize_path_segment` etc. intakt — keine Visibility-Promotion, keine fragile Plugin-Referenz.
+- **ARCH-001 Schritt 5 — `SBU_Upload_Flow` + `SBU_Restore_Flow` als Traits** — der komplette Upload-Lebenszyklus (`on_backup_complete`, `create_upload_queue`, `process_queue_tick`, `upload_one_chunk`, `finish_queue`, `verify_backup`, `persist_backup_hashes`, `enforce_retention`, `cleanup_updraft_history`, `find_backup_files`, `extract_backup_nonce`) und der Restore-Lebenszyklus (`verify_restored_file`, `process_restore_tick`) wohnen in `includes/trait-sbu-upload-flow.php` und `includes/trait-sbu-restore-flow.php`. Gleiche Trait-Strategie wie bei Schritt 4. Die gemeinsam genutzten Helfer (`safe_queue_update`, `detect_worker_crash_and_defer`, `maybe_notify_stall`, `get_adaptive_limits`, `tick_budget_exhausted`, `compute_queue_timeout`, `is_aborted`, `log_failed_files`, `get_updraft_dir`, `get_memory_limit`) bleiben in `SBU_Plugin`, weil beide Flows sie brauchen.
+- **`SBU_Plugin` jetzt ~1100 Zeilen** — Klasse ist von ursprünglich 4201 Zeilen auf rund 1100 Zeilen geschrumpft (−74 %). Sie ist damit wieder als Koordinations-Klasse lesbar: Settings, Admin-UI, Cron-Auth, Tick-Sizing, Queue-Lifecycle-Helfer, und das Zusammensetzen der drei Traits.
+
+### Geändert
+
+- **`SBU_Queue_Engine::tick_is_gated()` als `@phpstan-impure` markiert** — die Methode liest bei jedem Aufruf frisch aus `SBU_QUEUE` (via `wp_cache_delete`). PHPStan hielt nach der Trait-Kompositon wiederholte Aufrufe für redundant und warf einen `if.alwaysTrue`-Fehler auf der Post-Sleep-Prüfung in `ajax_cron_ping`. Korrekt ist: der Gate-Wert kann sich zwischen zwei Aufrufen ändern (Tick hat einen Backoff gesetzt, Retention-Tick hat ihn gelöscht). Die Annotation dokumentiert das und stellt den Analyzer zufrieden.
+
+### Tests
+
+92 PHPUnit-Tests / 263 Assertions — alle grün. PHPCS (WordPress-Standard, Plugin-Source) und PHPStan (Level 5) sauber. Keine Test-Anpassungen nötig — Traits komponieren zur Compile-Zeit in `SBU_Plugin`, die bestehenden `SBU_Plugin::*`-Referenzen in den Tests funktionieren unverändert.
+
 ## [1.0.3] — 2026-04-19
 
 Zweiter Audit-Durchgang: UI-Feinschliff, Härtung des internen Cron-Pfads, Rausziehen dreier Services aus der God-Class.

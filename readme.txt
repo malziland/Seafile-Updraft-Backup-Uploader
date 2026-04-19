@@ -4,7 +4,7 @@ Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.3
+Stable tag: 1.0.4
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -94,6 +94,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 
 == Changelog ==
 
+= 1.0.4 =
+* ARCH-001 abgeschlossen: Schritt 4 zieht alle 24 Ajax-Handler in `SBU_Admin_Ajax` (Trait), Schritt 5 zerlegt Upload- und Restore-Flow in `SBU_Upload_Flow` bzw. `SBU_Restore_Flow` (Traits). Trait-Kompositon hält alle Private-Zugriffe intakt — null Visibility-Promotion. `SBU_Plugin` schrumpft von 4201 auf ~1100 Zeilen (−74 %). `SBU_Queue_Engine::tick_is_gated()` als `@phpstan-impure` markiert. Reines Refactoring, Verhalten 1:1. 92 Tests / 263 Assertions, alle grün.
+
 = 1.0.3 =
 * Zweiter Audit-Durchgang: Brute-Force-Schutz für den internen Cron-Schlüssel (WARNUNG ab 5 Fehlversuchen/h), Cron-Key jetzt im `X-SBU-Cron-Key`-Header statt im POST-Body, Zero-Traffic-Backstop für Log-Retention auf idle Admin-Sites. Status-Pillen in der Backup-Liste zentriert (kein Treppenversatz mehr). Refactoring ARCH-001 Schritte 1–3: `SBU_Activity_Log`, `SBU_Mail_Notifier`, `SBU_Queue_Engine` als eigene Services ausgelagert. Schritte 4–5 folgen in v1.0.4. 92 Tests / 263 Assertions, alle grün.
 
@@ -107,6 +110,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.4 =
+Abschluss des ARCH-001-Refactorings: Ajax-Handler, Upload-Flow und Restore-Flow sind jetzt als Traits ausgelagert. `SBU_Plugin` ist von 4201 auf ~1100 Zeilen runter (−74 %). Reine Umstrukturierung, Verhalten unverändert. Keine Migration nötig.
 
 = 1.0.3 =
 Sicherheits- und Architektur-Update: Cron-Schlüssel jetzt im Header (nicht mehr im Body), Brute-Force-Warnung im Aktivitätsprotokoll, UI-Treppenversatz bei Backup-Status-Pillen behoben. Drei Services aus der God-Class ausgelagert — Verhalten unverändert. Keine Migration nötig.
