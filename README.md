@@ -34,6 +34,7 @@ UpdraftPlus erstellt Backups — dieses Plugin übernimmt den Upload auf deinen 
 - Echtzeit-Fortschrittsbalken für Upload und Wiederherstellung
 - Dashboard-Widget mit letztem Backup-Status
 - E-Mail-Benachrichtigungen bei Fehler
+- **Worker-Crash-Notbremse** (seit 1.0.7) — bei wiederholtem PHP-Prozess-Tod am gleichen Byte wird die Chunk-Größe automatisch halbiert; bleibt die Datei trotzdem stecken, wird sie übersprungen statt die ganze Queue zu blockieren
 - AES-256-CBC Passwortverschlüsselung (zufälliger IV, OpenSSL-Pflicht)
 - Komplett deutsche Benutzeroberfläche
 
@@ -94,7 +95,7 @@ seafile-updraft-backup-uploader/
 │   ├── css/admin.css                     — Admin-Styles
 │   └── js/admin.js                       — Admin-UI-Script
 ├── languages/                            — Übersetzungsdateien (DE/EN, .pot-Template)
-├── tests/                                — PHPUnit 11 + Brain\Monkey Test-Suite (121 Tests)
+├── tests/                                — PHPUnit 11 + Brain\Monkey Test-Suite (123 Tests)
 ├── scripts/                              — regen-pot.sh, check-i18n.sh
 ├── readme.txt                            — WordPress.org Plugin-Header
 ├── LICENSE                               — MIT
@@ -105,7 +106,7 @@ seafile-updraft-backup-uploader/
 ```
 
 **Kernkomponenten:**
-- `SBU_Plugin` — Haupt-Controller. Bindet die drei Traits ein und orchestriert Admin-Init, Einstellungen, Queue-Bootstrap sowie Crash-Detection.
+- `SBU_Plugin` — Haupt-Controller. Bindet die drei Traits ein und orchestriert Admin-Init, Einstellungen, Queue-Bootstrap sowie die dreistufige Crash-Detection (Retry → adaptive Chunk-Verkleinerung → Skip; siehe [ARCHITECTURE.md](ARCHITECTURE.md#crash-detection)).
 - `SBU_Queue_Engine` — Tick-Gate (`next_allowed_tick_ts`-Logik), `add_option`-basiertes Queue-Lock mit Stale-Lock-Recovery.
 - `SBU_Activity_Log` — Aktivitätsprotokoll als gekappter Ring-Buffer mit konfigurierbarer Retention und täglichem Cron-Prune.
 - `SBU_Mail_Notifier` — E-Mail-Benachrichtigungen für Erfolg / Fehler / nur Fehler; keine Templates im Haupt-Controller.
@@ -124,7 +125,7 @@ git clone https://github.com/malziland/Seafile-Updraft-Backup-Uploader.git
 cd Seafile-Updraft-Backup-Uploader
 composer install                                 # PHP 8.2+ erforderlich
 
-./vendor/bin/phpunit                             # 121 Tests / 333 Assertions
+./vendor/bin/phpunit                             # 123 Tests / 343 Assertions
 ./vendor/bin/phpcs --extensions=php \            # WordPress Coding Standards
     --ignore=vendor,languages,assets,tests,.github,scripts .
 ./vendor/bin/phpstan analyse --level=5 \         # statische Analyse

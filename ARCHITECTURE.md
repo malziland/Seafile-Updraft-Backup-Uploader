@@ -22,7 +22,7 @@ includes/
 views/admin-page.php                  settings page template
 assets/js/admin.js                    admin UI (progress polling, pause/resume)
 assets/css/admin.css                  admin UI styles
-tests/                                PHPUnit 11 + Brain\Monkey (121 tests)
+tests/                                PHPUnit 11 + Brain\Monkey (123 tests)
 ```
 
 ## Module boundaries
@@ -144,22 +144,64 @@ blip doesn't leave a permanent slowdown behind.
 Reverse proxies (Cloudflare Tunnel, nginx) and PHP memory-limit kills can
 terminate a worker mid-chunk. From WP's point of view the tick just never
 returns. `detect_worker_crash_and_defer()` runs at the top of every
-`process_queue_tick()` / `process_restore_tick()`:
+`process_queue_tick()` / `process_restore_tick()`.
+
+### Three-stage escalation (since 1.0.7)
+
+A naive "log + backoff + retry" loop is not sufficient: a chunk that
+*reliably* kills the worker will keep killing it on resume, and the
+queue can stay stuck on the same byte for the entire 12-h
+`SBU_QUEUE_TIMEOUT` window. (Observed in production on a 172 MB
+`uploads.zip` that crashed at exactly 120 MB twice in a row, burning
+17.8 h before timing out — and the next backup file in the queue was
+never started.) The detector therefore escalates:
 
 ```
-if last_activity older than queue_lock_ttl() + 30 s
-   and no gate is currently active
-then
-    bump retries
-    install backoff via next_allowed_tick_ts
-    log WARNUNG with file, offset, idle minutes
-    reschedule and return
+1. Crash detected:
+     bump retries, install backoff, log WARNUNG, reschedule.
+
+2. Same byte offset as previous crash on this file:
+     halve the per-file chunk size (floor 4 MiB), log
+     "an gleicher Stelle — Chunk-Größe auf X MB reduziert".
+
+3. Either: chunk already at floor AND still crashing at same offset,
+   or: total crash retries on this file >= CRASH_RETRY_CAP (5):
+     mark the file 'error', advance file_idx, let the queue
+     continue with the next file. Log FEHLER:
+     "Datei nach wiederholten Worker-Abstürzen übersprungen".
 ```
 
-Without this, a silent worker death would turn into a 12-hour wait for
-`SBU_QUEUE_TIMEOUT` to fire. With it, the next tick notices the stale
-`last_activity`, logs the crash, and installs backoff instead of immediately
-re-entering the same upload that just killed the worker.
+### File-level state carried across crashes
+
+Three fields on each `$queue['files'][$idx]` entry drive the
+escalation:
+
+| Field | Meaning |
+|---|---|
+| `crash_offset` | Byte offset at the moment of the previous crash. Compared against the current offset to decide "same offset". |
+| `crashes_at_offset` | Counter — number of consecutive crashes at the same offset. |
+| `chunk_size_override` | Per-file override of `$queue['chunk_size']`. Set by step 2; read by `process_queue_tick()` to size each chunk request. |
+
+All three are cleared after the next *successful* chunk on this file —
+a one-off crash followed by recovery doesn't leave permanent state
+behind, but a chunk-size shrink that already helped is preserved for
+the rest of the file (a chunk that crashed once might crash again
+later in the same file).
+
+### Tuning
+
+Two class-level constants in `SBU_Plugin`:
+
+```php
+private const CHUNK_FLOOR_BYTES = 4 * 1024 * 1024;  // smallest chunk we'll send
+private const CRASH_RETRY_CAP   = 5;                // skip the file beyond this
+```
+
+`CHUNK_FLOOR_BYTES` is chosen to fit under any reasonable
+`memory_limit` / `max_execution_time` while keeping multi-GB files
+finishable in a sane number of ticks. `CRASH_RETRY_CAP` is set so
+legitimate transient failures (Seafile restart, network blip) still
+recover, but a genuinely stuck chunk doesn't burn hours.
 
 ## safe_queue_update: protecting terminal writes
 
@@ -277,7 +319,7 @@ What the current suite covers:
 |---|---|---|
 | Password crypto | `CryptoTest.php` | Encrypt/decrypt round-trip + legacy-IV migration |
 | Queue integrity | `SafeQueueUpdateTest.php` | Mid-tick writes never clobber terminal status |
-| Tick gating | `CrashDetectionGateTest.php` | Worker-crash backoff installs gate correctly |
+| Tick gating + crash escalation | `CrashDetectionGateTest.php` | Worker-crash backoff installs gate; same-offset crashes halve the chunk size; skip-on-cap and skip-at-floor advance the queue past the stuck file |
 | Error classification | `ErrorClassificationTest.php` | Transient vs. deadline vs. client distinctions |
 | Retry / backoff | `RetryDelayTest.php`, `RateControllerTest.php` | Exponential-delay tiers, AIMD behaviour |
 | Adaptive budget | `AdaptiveLimitsTest.php` | Tick budget / chunk / parallelism scale with server limits; `compute_queue_timeout` size-based |
@@ -290,7 +332,7 @@ What the current suite covers:
 | Log sanitization | `LogSanitizerTest.php` | Every masking rule, plus an end-to-end leak check |
 
 At the time of writing (PHP 8.5 runtime, PHPUnit 11.5.55) the suite reports
-**121 tests, 333 assertions**. The CI pipeline
+**123 tests, 343 assertions**. The CI pipeline
 (`.github/workflows/ci.yml`) runs PHPUnit across PHP 8.2 / 8.3 / 8.4 and
 gates merges on PHPCS (WordPress Coding Standards), PHPStan (level 5),
 and Gitleaks.

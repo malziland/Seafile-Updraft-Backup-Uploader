@@ -45,7 +45,11 @@ Please do **not** open a public GitHub issue for security vulnerabilities.
   include the site hostname via UpdraftPlus' default naming), and the user
   e-mail shown during connection tests. Use the *anonymized export* when
   sharing logs for support; raw exports leak the above to whoever receives
-  them.
+  them. The crash-detection log entries introduced in 1.0.7 (WARNUNG "Worker
+  still abgestürzt … an gleicher Stelle", FEHLER "Datei nach wiederholten
+  Worker-Abstürzen übersprungen") follow the same data shape: filename plus
+  byte offset, both already masked by the existing sanitizer rules in the
+  anonymized export.
 - **Cron-ping key.** The optional external heartbeat endpoint
   (`admin-ajax.php?action=sbu_cron_ping`) accepts the 32-char site-local key
   via HTTP header (`X-SBU-Cron-Key`, recommended) or query string (legacy).

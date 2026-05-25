@@ -101,6 +101,15 @@ verify manually:
 - [ ] Small-file upload works (single chunk).
 - [ ] Large-file chunked upload works (file larger than the configured chunk).
 - [ ] Pause / Resume preserves the exact byte offset.
+- [ ] **Worker-crash recovery** (since 1.0.7): if your change touches
+      `detect_worker_crash_and_defer()` or `process_queue_tick()`, simulate
+      a stuck chunk (e.g. drop `SBU_TIMEOUT_UPLOAD` to 1 s on a large file).
+      Expected sequence in the activity log: WARNUNG "Worker still
+      abgestürzt …" → second WARNUNG with "an gleicher Stelle — Chunk-Größe
+      auf X MB reduziert" → eventually FEHLER "Datei nach wiederholten
+      Worker-Abstürzen übersprungen" with the queue advancing to the next
+      file. Verify `file_idx` and `err` were incremented and `wpcore.zip`
+      (or whatever the next file is) gets uploaded.
 - [ ] Retention management deletes old backups on the Seafile side.
 - [ ] E-mail notifications are sent when `notify` is set to `error` or
       `always` and fire for the right cases.
