@@ -4,7 +4,7 @@ Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.2
-Stable tag: 1.0.6
+Stable tag: 1.0.7
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -100,6 +100,11 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 
 == Changelog ==
 
+= 1.0.7 =
+* **Fix:** Worker-Crash-Notbremse — verhindert den 17-Stunden-Resume-Loop, der in Produktion auftrat, wenn ein bestimmter Chunk den PHP-Prozess wiederholt killte (häufig bei großen Uploads auf Hostern wie Hostinger mit harten `max_execution_time`/Memory-Limits). Neues Verhalten: (a) bei wiederholtem stillem Worker-Tod am **gleichen Byte-Offset** wird die Chunk-Größe für die betroffene Datei automatisch halbiert (Untergrenze 4 MiB); (b) wenn auch mit der minimalen Chunk-Größe weiter dieselbe Stelle crasht, wird die Datei als Fehler markiert und die Queue läuft mit den nächsten Dateien weiter; (c) hartes Maximum von 5 Crash-Wiederaufnahmen pro Datei. Vorher blockierte ein einzelner kaputter Chunk die gesamte Queue bis zum 17,8-h-Gesamt-Timeout — und die nachfolgenden Backup-Dateien wurden überhaupt nicht hochgeladen.
+* **Diagnose:** Neuer Log-Eintrag „Worker still abgestürzt … an gleicher Stelle — Chunk-Größe auf X MB reduziert" macht die adaptive Verkleinerung im Aktivitätsprotokoll sichtbar. Skip-Fall wird als `FEHLER: Datei nach wiederholten Worker-Abstürzen übersprungen` geloggt.
+* **Tests:** Drei neue Unit-Tests in `CrashDetectionGateTest` (Skip nach Retry-Cap, Same-Offset-Chunk-Halbierung, Floor-erreicht-Skip). 123 Tests / 343 Assertions, alle grün.
+
 = 1.0.6 =
 * **UI-Aufräumen:** Einzeldatei-Download aus dem „Dateien anzeigen"-Panel entfernt. Grund: der Button hieß „Download", kopierte aber serverseitig ins UpdraftPlus-Verzeichnis statt in den Browser — und zeigte die Erfolgsmeldung in einem Statusfeld außerhalb des Sichtbereichs, was den „nichts passiert"-Eindruck erzeugte. Der Knopf war zudem ohne Nutzen: UpdraftPlus-Chunks (`uploads7.zip`, `uploads14.zip`, …) sind semantisch undurchsichtig, und der **Wiederherstellen**-Button zieht fehlende Dateien über „Teilweise lokal" bereits gezielt nach. Für forensische Einzeldatei-Inspektion ist die Seafile-Weboberfläche der direktere Weg.
 * **Aufgeräumt:** Zusätzlich zum UI-Element sind `SBU_Plugin::ajax_download()`, die JS-Funktion `sDl` (mit Confirm-Dialog, der nur den rohen Dateinamen zeigte), der `download-file`-Event-Delegation-Eintrag und die jetzt tote `SBU_Seafile_API::download_file()`-Methode samt `DEFAULT_DOWNLOAD_CHUNK`-Konstante entfernt. Reine Reduktion — Verhalten der Upload-, Restore- und Löschfunktionen bleibt identisch.
@@ -125,6 +130,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.7 =
+Wichtiger Stabilitäts-Fix für große Uploads: bisher konnte ein einzelner Chunk, der den PHP-Prozess wiederholt killte, die Backup-Queue bis zu 17 Stunden blockieren (und alle nachfolgenden Backup-Dateien wurden gar nicht hochgeladen). Neue Notbremse halbiert bei Wiederholungs-Absturz am gleichen Byte automatisch die Chunk-Größe; bleibt die Datei trotzdem stecken, wird sie übersprungen statt die ganze Queue zu blockieren. Keine Migration nötig.
 
 = 1.0.6 =
 UI-Bereinigung: Einzeldatei-Download entfernt. Der Button hatte einen verwirrenden „nichts passiert"-Eindruck ausgelöst (Datei landete im `wp-content/updraft/`-Ordner, Erfolgsmeldung lag außerhalb des Sichtfelds) und bot keinen klaren Mehrwert gegenüber „Wiederherstellen" oder der Seafile-Weboberfläche. Keine Migration nötig.

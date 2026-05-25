@@ -4,6 +4,37 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.7] — 2026-05-25
+
+Stabilitäts-Fix für große Uploads: die Worker-Crash-Wiederaufnahme hat bisher unbegrenzt lange versucht, an exakt der gleichen Stelle weiterzumachen, an der der PHP-Prozess gerade gestorben war — in der Praxis führte das zu einem 17-Stunden-Resume-Loop bei einer 172 MB großen `uploads.zip`, in der die Datei wiederholt bei 120 MB hängenblieb und die nachfolgende `wpcore.zip` deshalb nie hochgeladen wurde. Diese Version führt eine dreistufige Notbremse ein.
+
+### Behoben
+
+- **Wiederaufnahme-Endlosschleife bei wiederholten Worker-Abstürzen am gleichen Byte-Offset.** Bisher: jeder neue Crash erhöhte nur den Backoff-Delay (bis 10 min Cap), nichts veränderte sich am Upload-Verhalten, und es gab keine Abbruchbedingung außer dem 17,8-h-Gesamt-Timeout der Queue. Folge: ein einzelner kaputter Chunk konnte stundenlang den restlichen Backup-Lauf blockieren.
+
+### Hinzugefügt
+
+- **Same-Offset-Crash-Tracking pro Datei.** Neue Felder `crash_offset` und `crashes_at_offset` auf jedem Datei-Eintrag der Queue. Wenn nach einem stillen Worker-Tod der Resume erneut am gleichen Byte stirbt, ist das das Signal, dass dieser eine Chunk das Problem ist.
+- **Adaptive Chunk-Größen-Reduktion.** Zweiter Crash am selben Offset → die Chunk-Größe für diese eine Datei wird halbiert (per-File-Override via `chunk_size_override`, andere Dateien der Queue bleiben unberührt). Untergrenze 4 MiB (Konstante `SBU_Plugin::CHUNK_FLOOR_BYTES`) — klein genug, um unter realistischen `memory_limit`/`max_execution_time`-Werten durchzulaufen, groß genug, dass eine GB-Datei in vernünftiger Zeit fertig wird.
+- **Skip-statt-blockieren-Logik.** Greift in zwei Fällen: (a) Chunk-Größe ist bereits am Floor und es crasht weiter am gleichen Offset (= Problem liegt nicht an der Chunk-Größe, sondern z. B. an einem Seafile-seitig hängenden PUT oder einem korrupten Byte); (b) das Crash-Retry-Limit von 5 für eine einzelne Datei ist erreicht (Konstante `SBU_Plugin::CRASH_RETRY_CAP`). In beiden Fällen wird die Datei als Fehler markiert, der `err`-Zähler hochgesetzt und die Queue läuft mit der nächsten Datei weiter — statt die gesamte Backup-Übertragung wegen einer einzelnen problematischen Datei zu blockieren.
+- **Drei neue Diagnose-Log-Einträge:**
+  - `WARNUNG: Worker still abgestürzt vor X min an gleicher Stelle — Chunk-Größe auf Y MB reduziert, Wiederaufnahme bei …` (adaptive Reduktion ist sichtbar)
+  - `FEHLER: Datei nach wiederholten Worker-Abstürzen übersprungen: …` (klare Begründung statt unerklärlicher Stille)
+  - Reset von `crash_offset` und `crashes_at_offset` nach jedem erfolgreichen Chunk, damit ein einmaliger Crash nicht für immer im Datei-Eintrag klebt.
+
+### Geändert
+
+- **`detect_worker_crash_and_defer()` in `SBU_Plugin`** komplett überarbeitet (≈110 statt 40 Zeilen). Die Funktion war vorher ein reiner Backoff-Installer; sie ist jetzt der zentrale Eskalations-Entscheider (Retry → Chunk halbieren → Skip).
+- **`process_queue_tick()` in `SBU_Upload_Flow`** liest pro Datei `chunk_size_override` und übergibt diesen Wert an `upload_one_chunk()`. Fallback bleibt die Queue-weite `chunk_size`.
+
+### Tests
+
+- **Drei neue Unit-Tests** in `tests/unit/CrashDetectionGateTest.php`:
+  - `test_file_is_skipped_after_retry_cap` — ersetzt den alten `test_backoff_is_capped_at_600_seconds`, da der 600-s-Cap durch die neue Skip-Logik vor dem Greifen ohnehin überschritten wird.
+  - `test_same_offset_crash_halves_chunk_size` — reproduziert exakt den 120-MB-Stall aus dem Produktions-Log und prüft, dass die Chunk-Größe von 40 MB auf 20 MB sinkt.
+  - `test_same_offset_crash_at_chunk_floor_skips_file` — prüft die Skip-statt-Loop-Logik, wenn die Chunk-Größe bereits minimal ist.
+- 123 Tests / 343 Assertions, alle grün. PHPStan ohne Befund.
+
 ## [1.0.6] — 2026-04-19
 
 UI-Aufräumen: Einzeldatei-Download aus der Backup-Liste entfernt. Kein Feature-Verlust, nur weniger Verwirrung.

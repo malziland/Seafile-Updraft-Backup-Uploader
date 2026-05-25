@@ -165,21 +165,96 @@ final class CrashDetectionGateTest extends TestCase {
     }
 
     /**
-     * Backoff cap: retries above the 10-minute ceiling stay at 600s.
+     * Retry cap: once a single file has racked up CRASH_RETRY_CAP crashes,
+     * skip it and let the queue continue with the next file. Replaces the
+     * old "infinite backoff up to 600s" behaviour that produced the 17h
+     * production loop the cap was added to prevent.
      */
-    public function test_backoff_is_capped_at_600_seconds(): void {
+    public function test_file_is_skipped_after_retry_cap(): void {
         $queue = $this->baseQueue( [
             'last_activity' => time() - 10_000,
-            'files'         => [ [ 'path' => '/srv/backup-db.gz', 'retries' => 42 ] ],
+            'files'         => [
+                [ 'path' => '/srv/backup-uploads.zip', 'retries' => 42, 'offset' => 0 ],
+                [ 'path' => '/srv/backup-wpcore.zip', 'retries' => 0, 'offset' => 0 ],
+            ],
         ] );
         $this->options[ SBU_QUEUE ] = $queue;
-        $before = time();
 
         $this->callPrivate( $this->plugin, 'detect_worker_crash_and_defer', [ $queue ] );
 
-        $gate = $this->options[ SBU_QUEUE ]['next_allowed_tick_ts'];
-        $this->assertGreaterThanOrEqual( $before + 600, $gate );
-        $this->assertLessThanOrEqual( time() + 600, $gate );
+        $persisted = $this->options[ SBU_QUEUE ];
+        $this->assertSame( 'error', $persisted['files'][0]['status'] );
+        $this->assertSame( 1, $persisted['err'] );
+        $this->assertSame( 1, $persisted['file_idx'], 'queue must advance past the stuck file' );
+        $this->assertArrayNotHasKey( 'next_allowed_tick_ts', $persisted );
+
+        $log = $this->options[ SBU_ACTIVITY ] ?? '';
+        $this->assertStringContainsString( 'FEHLER', $log );
+        $this->assertStringContainsString( 'backup-uploads.zip', $log );
+    }
+
+    /**
+     * Repeat crash at the *same byte offset* halves the per-file chunk
+     * size. The next tick will then send a smaller request that fits
+     * under the host's PHP limits.
+     */
+    public function test_same_offset_crash_halves_chunk_size(): void {
+        $queue = $this->baseQueue( [
+            'last_activity' => time() - 500,
+            'chunk_size'    => 40 * 1024 * 1024,
+            'files'         => [ [
+                'path'              => '/srv/backup-uploads.zip',
+                'retries'           => 1,
+                'offset'            => 125_829_120, // 120 MB — the actual stall point from the production log
+                'crash_offset'      => 125_829_120,
+                'crashes_at_offset' => 1,
+            ] ],
+        ] );
+        $this->options[ SBU_QUEUE ] = $queue;
+
+        $this->callPrivate( $this->plugin, 'detect_worker_crash_and_defer', [ $queue ] );
+
+        $persisted = $this->options[ SBU_QUEUE ];
+        $this->assertArrayHasKey( 'chunk_size_override', $persisted['files'][0] );
+        $this->assertSame( 20 * 1024 * 1024, $persisted['files'][0]['chunk_size_override'] );
+        $this->assertSame( 2, $persisted['files'][0]['crashes_at_offset'] );
+
+        $log = $this->options[ SBU_ACTIVITY ] ?? '';
+        $this->assertStringContainsString( 'an gleicher Stelle', $log );
+        $this->assertStringContainsString( '20 MB', $log );
+    }
+
+    /**
+     * When the chunk size has already been shrunk to the floor and we
+     * still crash at the same offset, skip the file. This is the case
+     * where the offending byte is not a chunk-size problem at all
+     * (Seafile-side stuck PUT, corrupt source byte, etc.) so retrying
+     * forever can't help.
+     */
+    public function test_same_offset_crash_at_chunk_floor_skips_file(): void {
+        $queue = $this->baseQueue( [
+            'last_activity' => time() - 500,
+            'chunk_size'    => 40 * 1024 * 1024,
+            'files'         => [
+                [
+                    'path'                => '/srv/backup-uploads.zip',
+                    'retries'             => 1,
+                    'offset'              => 125_829_120,
+                    'crash_offset'        => 125_829_120,
+                    'crashes_at_offset'   => 1,
+                    'chunk_size_override' => 4 * 1024 * 1024, // already at floor
+                ],
+                [ 'path' => '/srv/backup-wpcore.zip', 'retries' => 0, 'offset' => 0 ],
+            ],
+        ] );
+        $this->options[ SBU_QUEUE ] = $queue;
+
+        $this->callPrivate( $this->plugin, 'detect_worker_crash_and_defer', [ $queue ] );
+
+        $persisted = $this->options[ SBU_QUEUE ];
+        $this->assertSame( 'error', $persisted['files'][0]['status'] );
+        $this->assertSame( 1, $persisted['file_idx'] );
+        $this->assertSame( 1, $persisted['err'] );
     }
 
     /**

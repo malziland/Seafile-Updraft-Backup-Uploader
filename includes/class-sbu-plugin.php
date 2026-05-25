@@ -65,6 +65,22 @@ final class SBU_Plugin {
 	use SBU_Restore_Flow;
 
 	/**
+	 * Lower bound for adaptive chunk-size reduction after repeated worker
+	 * crashes at the same byte offset. 4 MiB is small enough to fit under
+	 * any reasonable PHP memory_limit/max_execution_time, large enough
+	 * that a multi-GB file still finishes in a reasonable number of ticks.
+	 */
+	private const CHUNK_FLOOR_BYTES = 4 * 1024 * 1024;
+
+	/**
+	 * Hard cap on crash-driven retries for a single file. Beyond this we
+	 * skip the file rather than blocking the queue. Set so legitimate
+	 * transient failures (Seafile restart, network blip) still recover,
+	 * but a truly stuck chunk doesn't burn hours.
+	 */
+	private const CRASH_RETRY_CAP = 5;
+
+	/**
 	 * Activity-log service (ARCH-001 Schritt 1 — aus der God-Class rausgezogen).
 	 *
 	 * Alle schreibenden/lesenden Log-Operationen laufen durch diesen Service.
@@ -784,12 +800,17 @@ final class SBU_Plugin {
 	 * hosting, OOM, Cloudflare 524 on the worker path). A stale queue
 	 * that is NOT in a planned backoff window implies a crash.
 	 *
-	 * Logs one WARNUNG per detected crash so the user has a clear trail
-	 * in the activity log instead of an unexplained multi-minute
-	 * silence. Also bumps the file's retry counter, installs a backoff
-	 * gate, persists the queue, and reschedules the next tick. The
-	 * caller should return immediately when this function returns true,
-	 * deferring actual work to the scheduled tick.
+	 * Recovery strategy (in order of escalation):
+	 *   1. First crash on a file: log warning, exponential backoff, retry.
+	 *   2. Second crash at the *same byte offset*: halve this file's
+	 *      chunk size (down to {@see self::CHUNK_FLOOR_BYTES}) — a chunk
+	 *      that repeatedly kills the worker is almost certainly too big
+	 *      for the host's PHP limits.
+	 *   3. Chunk already at the floor AND crashing at the same offset,
+	 *      OR retry counter exceeded {@see self::CRASH_RETRY_CAP}: mark
+	 *      the file as errored, skip to the next file. Better one failed
+	 *      file than a multi-hour queue stall blocking the rest of the
+	 *      backup (we've seen 17h loops in production before this cap).
 	 *
 	 * @param array $queue In-memory queue snapshot.
 	 * @return bool True if a crash was detected and backoff installed.
@@ -806,31 +827,98 @@ final class SBU_Plugin {
 			return false;
 		}
 
-		$idx  = (int) ( $queue['file_idx'] ?? 0 );
-		$file = $queue['files'][ $idx ] ?? array();
-		$fn   = $file['path'] ?? '';
-		$fn   = $fn ? basename( $fn ) : ( $file['name'] ?? '?' );
-		$off  = round( ( $file['offset'] ?? 0 ) / 1024 / 1024, 1 );
-		$mins = round( $idle / 60, 1 );
-
-		$this->activity_logger->log(
-			'WARNUNG',
-			sprintf(
-				/* translators: %1$s minutes since last activity, %2$s file name, %3$s offset in MB */
-				__( 'Worker still abgestürzt vor %1$s min — Wiederaufnahme bei %2$s @ %3$s MB', 'seafile-updraft-backup-uploader' ),
-				$mins,
-				$fn,
-				$off
-			)
-		);
-
-		$retries = ( $queue['files'][ $idx ]['retries'] ?? 0 ) + 1;
-		$delay   = min( $retries * 60, 600 );
-		if ( isset( $queue['files'][ $idx ] ) ) {
-			$queue['files'][ $idx ]['retries'] = $retries;
+		$idx = (int) ( $queue['file_idx'] ?? 0 );
+		if ( ! isset( $queue['files'][ $idx ] ) ) {
+			return false;
 		}
-		$queue['next_allowed_tick_ts'] = time() + $delay;
-		$queue['last_activity']        = time();
+		$file    = $queue['files'][ $idx ];
+		$fn      = $file['path'] ?? '';
+		$fn      = $fn ? basename( $fn ) : ( $file['name'] ?? '?' );
+		$cur_off = (int) ( $file['offset'] ?? 0 );
+		$off_mb  = round( $cur_off / 1024 / 1024, 1 );
+		$mins    = round( $idle / 60, 1 );
+
+		// Same-offset detection: did resume make zero progress since the
+		// last crash? That's the signal that this chunk is the killer.
+		$prev_crash_offset = array_key_exists( 'crash_offset', $file ) ? (int) $file['crash_offset'] : -1;
+		$same_offset       = ( $prev_crash_offset === $cur_off );
+		$crashes_here      = $same_offset ? ( (int) ( $file['crashes_at_offset'] ?? 0 ) ) + 1 : 1;
+		$total_retries     = (int) ( $file['retries'] ?? 0 ) + 1;
+
+		// Adaptive chunk-size reduction on repeat crash at same offset.
+		$chunk_floor    = self::CHUNK_FLOOR_BYTES;
+		$current_chunk  = (int) ( $file['chunk_size_override'] ?? $queue['chunk_size'] ?? 0 );
+		$new_chunk      = $current_chunk;
+		$chunk_reduced  = false;
+		if ( $same_offset && $current_chunk > $chunk_floor ) {
+			$new_chunk     = max( $chunk_floor, (int) floor( $current_chunk / 2 ) );
+			$chunk_reduced = ( $new_chunk < $current_chunk );
+		}
+
+		// Hard give-up conditions.
+		$give_up = false;
+		if ( $same_offset && $crashes_here >= 2 && $current_chunk <= $chunk_floor ) {
+			$give_up = true;
+		} elseif ( $total_retries >= self::CRASH_RETRY_CAP ) {
+			$give_up = true;
+		}
+
+		if ( $give_up ) {
+			$queue['files'][ $idx ]['status'] = 'error';
+			++$queue['err'];
+			$queue['file_idx'] = $idx + 1;
+			unset( $queue['next_allowed_tick_ts'] );
+			$queue['last_activity'] = time();
+
+			$this->activity_logger->log(
+				'FEHLER',
+				sprintf(
+					/* translators: %1$s file name, %2$s MB offset */
+					__( 'Datei nach wiederholten Worker-Abstürzen übersprungen: %1$s (steckt bei %2$s MB) — Queue läuft mit den nächsten Dateien weiter', 'seafile-updraft-backup-uploader' ),
+					$fn,
+					$off_mb
+				)
+			);
+			update_option( SBU_QUEUE, $queue, false );
+			$this->queue_engine->schedule_next_tick( 30 );
+			$this->queue_engine->spawn_next_tick();
+			return true;
+		}
+
+		// Normal recovery path.
+		if ( $chunk_reduced ) {
+			$queue['files'][ $idx ]['chunk_size_override'] = $new_chunk;
+			$new_mb                                        = round( $new_chunk / 1024 / 1024, 1 );
+			$this->activity_logger->log(
+				'WARNUNG',
+				sprintf(
+					/* translators: %1$s minutes, %2$s file, %3$s MB offset, %4$s new chunk MB */
+					__( 'Worker still abgestürzt vor %1$s min an gleicher Stelle — Chunk-Größe auf %4$s MB reduziert, Wiederaufnahme bei %2$s @ %3$s MB', 'seafile-updraft-backup-uploader' ),
+					$mins,
+					$fn,
+					$off_mb,
+					$new_mb
+				)
+			);
+		} else {
+			$this->activity_logger->log(
+				'WARNUNG',
+				sprintf(
+					/* translators: %1$s minutes since last activity, %2$s file name, %3$s offset in MB */
+					__( 'Worker still abgestürzt vor %1$s min — Wiederaufnahme bei %2$s @ %3$s MB', 'seafile-updraft-backup-uploader' ),
+					$mins,
+					$fn,
+					$off_mb
+				)
+			);
+		}
+
+		$delay = min( $total_retries * 60, 600 );
+		$queue['files'][ $idx ]['retries']           = $total_retries;
+		$queue['files'][ $idx ]['crash_offset']      = $cur_off;
+		$queue['files'][ $idx ]['crashes_at_offset'] = $crashes_here;
+		$queue['next_allowed_tick_ts']               = time() + $delay;
+		$queue['last_activity']                      = time();
 		update_option( SBU_QUEUE, $queue, false );
 		$this->queue_engine->schedule_next_tick( $delay );
 		return true;

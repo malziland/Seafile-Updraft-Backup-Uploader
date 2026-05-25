@@ -487,6 +487,12 @@ trait SBU_Upload_Flow {
 				}
 			}
 
+			// Per-file chunk-size override: when the crash detector halves the
+			// chunk size after repeated worker deaths at the same byte, the
+			// new value lives on the file (chunk_size_override) so it only
+			// affects the problem file. Falls back to the queue-wide default.
+			$effective_csz = (int) ( $queue['files'][ $idx ]['chunk_size_override'] ?? $csz );
+
 			// Upload chunks until file done or time up
 			while ( $offset < $fs ) {
 				if ( $this->tick_budget_exhausted( $tick_start ) ) {
@@ -521,7 +527,7 @@ trait SBU_Upload_Flow {
 				}
 
 				$chunk_t0 = microtime( true );
-				$result   = $this->upload_one_chunk( $link, $t, $bdir, $fp, $offset, $fs, $csz );
+				$result   = $this->upload_one_chunk( $link, $t, $bdir, $fp, $offset, $fs, $effective_csz );
 				$chunk_dt = microtime( true ) - $chunk_t0;
 
 				if ( is_wp_error( $result ) ) {
@@ -531,7 +537,7 @@ trait SBU_Upload_Flow {
 						if ( ! is_wp_error( $t ) ) {
 							$link = SBU_Seafile_API::get_upload_link( $s['url'], $t, $rid, $bdir );
 							if ( ! is_wp_error( $link ) ) {
-								$result = $this->upload_one_chunk( $link, $t, $bdir, $fp, $offset, $fs, $csz );
+								$result = $this->upload_one_chunk( $link, $t, $bdir, $fp, $offset, $fs, $effective_csz );
 							}
 						}
 					}
@@ -549,7 +555,7 @@ trait SBU_Upload_Flow {
 							wp_clear_scheduled_hook( SBU_CRON_HOOK );
 							return;
 						}
-						$chunk_mb = round( min( $csz, $fs - $offset ) / 1024 / 1024, 1 );
+						$chunk_mb = round( min( $effective_csz, $fs - $offset ) / 1024 / 1024, 1 );
 						$this->activity_logger->log(
 							'RETRY',
 							sprintf(
@@ -573,7 +579,7 @@ trait SBU_Upload_Flow {
 				// so the warning only fires when a chunk is genuinely close to
 				// the limit, not every time it takes a normal-ish amount of time.
 				if ( $chunk_dt > ( SBU_TIMEOUT_UPLOAD * 0.75 ) ) {
-					$chunk_mb = round( min( $csz, $fs - $offset ) / 1024 / 1024, 1 );
+					$chunk_mb = round( min( $effective_csz, $fs - $offset ) / 1024 / 1024, 1 );
 					$this->activity_logger->log(
 						'WARNUNG',
 						sprintf(
@@ -587,9 +593,17 @@ trait SBU_Upload_Flow {
 					);
 				}
 
-				// Success - reset retry counter and clear any standing backoff
+				// Success - reset retry counter and crash-tracking state, clear
+				// any standing backoff. We deliberately keep chunk_size_override
+				// in place for the rest of this file: a chunk that crashed once
+				// might crash again later in the same file, and shrinking it
+				// once was cheap compared to another worker death.
 				$queue['files'][ $idx ]['retries'] = 0;
-				unset( $queue['next_allowed_tick_ts'] );
+				unset(
+					$queue['files'][ $idx ]['crash_offset'],
+					$queue['files'][ $idx ]['crashes_at_offset'],
+					$queue['next_allowed_tick_ts']
+				);
 
 				if ( $result === true ) {
 					$offset = $fs;
