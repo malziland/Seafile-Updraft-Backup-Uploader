@@ -846,10 +846,10 @@ final class SBU_Plugin {
 		$total_retries     = (int) ( $file['retries'] ?? 0 ) + 1;
 
 		// Adaptive chunk-size reduction on repeat crash at same offset.
-		$chunk_floor    = self::CHUNK_FLOOR_BYTES;
-		$current_chunk  = (int) ( $file['chunk_size_override'] ?? $queue['chunk_size'] ?? 0 );
-		$new_chunk      = $current_chunk;
-		$chunk_reduced  = false;
+		$chunk_floor   = self::CHUNK_FLOOR_BYTES;
+		$current_chunk = (int) ( $file['chunk_size_override'] ?? $queue['chunk_size'] ?? 0 );
+		$new_chunk     = $current_chunk;
+		$chunk_reduced = false;
 		if ( $same_offset && $current_chunk > $chunk_floor ) {
 			$new_chunk     = max( $chunk_floor, (int) floor( $current_chunk / 2 ) );
 			$chunk_reduced = ( $new_chunk < $current_chunk );
@@ -913,7 +913,7 @@ final class SBU_Plugin {
 			);
 		}
 
-		$delay = min( $total_retries * 60, 600 );
+		$delay                                       = min( $total_retries * 60, 600 );
 		$queue['files'][ $idx ]['retries']           = $total_retries;
 		$queue['files'][ $idx ]['crash_offset']      = $cur_off;
 		$queue['files'][ $idx ]['crashes_at_offset'] = $crashes_here;
