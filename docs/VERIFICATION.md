@@ -5,9 +5,9 @@ STANDARD-Anforderung und jede aktive Profilpflicht trägt hier einen
 belastbaren Nachweis (Befehl + Ergebnis + Anker). Ausbaustufe: **STANDARD**
 (siehe [ADR-0001](adr/ADR-0001-ausbaustufe-profile-toolchain.md)).
 
-Referenz-Stand der letzten Vollverifikation: Commit `HEAD` (Audit-Remediation
-+ Dep-Update), Toolchain PHP 8.5.8 lokal / CI-Matrix PHP 8.2–8.4,
-Datum 2026-07-16.
+Referenz-Stand der letzten Vollverifikation: v1.0.10 / Commit `a605d99`
+(Audit-Remediation + Dep-Update + OPS-01-Fix), Toolchain PHP 8.5.8 lokal /
+CI-Matrix PHP 8.2–8.4, Datum 2026-07-16.
 
 | Anforderung | Evidenz / Befehl | Ergebnis (Anker) |
 |---|---|---|
@@ -67,8 +67,9 @@ Verifiziert per `gh api` (Read-back):
 | 2FA (Account `malziland`) | enabled (Authenticator-App), vom Betreiber per Screenshot bestätigt |
 
 Damit sind die produktionskritischen externen Kontrollen verifiziert.
-**PRODUCTION_READY: CONDITIONAL** — READY bis auf das dokumentierte
-OPS-01-Lock-Ownership-Restrisiko (kein Blocker, siehe Ausnahme-Register).
+**PRODUCTION_READY: READY** — das zuletzt offene OPS-01-Lock-Ownership-
+Restrisiko ist mit v1.0.10 behoben (siehe Ausnahme-Register); alle
+verbleibenden Ausnahmen sind dokumentiert und operativ vertretbar.
 
 ## Pflege
 
