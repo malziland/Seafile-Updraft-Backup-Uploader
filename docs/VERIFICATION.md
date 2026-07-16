@@ -53,6 +53,23 @@ Alle sieben Findings des Abnahme-Kurzaudits behoben; Nachweise:
 | PHPUnit auf 11.x, php_codesniffer auf 3.x gepinnt (keine Major-Updates) | PHPUnit 13 zieht die PHP-8.4-Toolchain nach und bräche die PHP-8.2-Testabdeckung; php_codesniffer 4 wird von wpcs 3.4.0 / phpcompatibility noch nicht unterstützt | malziland | sobald WPCS 4 erscheint bzw. die PHP-Mindestversion angehoben wird |
 | Queue-Lock ohne Ownership-Token (OPS-01-Restrisiko) | `release_lock()` prüft keinen Owner; ein Shutdown-Handler könnte theoretisch ein vom nächsten Tick frisch geholtes Lock freigeben (sub-Sekunden-Fenster bei Timeout-Fatal). Vorbestehend seit dem Restore-Flow, durch OPS-01 auch im Upload-Flow. Kein neuer Fehlertyp. | malziland | künftiges Finding — Fix wäre ein Lock-Ownership-Token (betrifft beide Flows) |
 
+## Externe Kontrollen (Plattform, gesetzt 2026-07-16)
+
+Verifiziert per `gh api` (Read-back):
+
+| Kontrolle | Status |
+|---|---|
+| Branch Protection auf `main` | aktiv — die 10 CI-Checks als Required Status Checks; Force-Push und Löschung gesperrt; `enforce_admins: false` (Solo-Maintainer behält direkten Push) |
+| Secret Scanning (Plattform) | enabled (zusätzlich zum Gitleaks-CI-Job) |
+| Push Protection | enabled |
+| Dependabot Vulnerability Alerts | enabled |
+| Dependabot Security Updates (Auto-Fix-PRs) | enabled |
+| 2FA (Account `malziland`) | enabled (Authenticator-App), vom Betreiber per Screenshot bestätigt |
+
+Damit sind die produktionskritischen externen Kontrollen verifiziert.
+**PRODUCTION_READY: CONDITIONAL** — READY bis auf das dokumentierte
+OPS-01-Lock-Ownership-Restrisiko (kein Blocker, siehe Ausnahme-Register).
+
 ## Pflege
 
 Diese Matrix wird bei jeder Änderung nachgezogen, die einen bestehenden
