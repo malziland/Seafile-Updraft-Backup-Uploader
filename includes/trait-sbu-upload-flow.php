@@ -354,6 +354,24 @@ trait SBU_Upload_Flow {
 		// Pre-schedule next tick in case PHP crashes during this one
 		$this->queue_engine->schedule_next_tick( 90 );
 
+		// Safety net mirroring the restore flow (OPS-01): if this upload tick
+		// dies from a PHP fatal or hard time-limit SIGKILL, the entry point's
+		// try/finally never runs, so the queue lock would linger until its TTL
+		// and an idle site would wait for the next cron. This shutdown callback
+		// releases the lock and spawns one loopback so the upload resumes
+		// promptly. Filtered on fatal error types so normal returns (where
+		// error_get_last() is null or a warning) don't trigger a spurious spawn.
+		$self = $this;
+		register_shutdown_function(
+			function () use ( $self ) {
+				$err = error_get_last();
+				if ( $err && in_array( $err['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ), true ) ) {
+					$self->release_queue_lock_public();
+					$self->spawn_next_tick_public();
+				}
+			}
+		);
+
 		$s          = $this->get_settings();
 		$pw         = SBU_Crypto::decrypt( $s['pass'] );
 		$tick_start = time();
