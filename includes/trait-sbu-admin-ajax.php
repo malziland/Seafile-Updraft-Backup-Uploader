@@ -688,8 +688,15 @@ trait SBU_Admin_Ajax {
 	 * AJAX: Export the activity log with identifying data masked.
 	 *
 	 * Used when sharing logs for support. Masks the Seafile host, library
-	 * UUIDs, folder paths, user e-mails, IPv4 addresses and the UpdraftPlus
-	 * nonce so a log can be posted publicly without leaking tenant data.
+	 * UUIDs, folder paths, user e-mails, IPv4/IPv6 addresses and the
+	 * UpdraftPlus nonce so a log can be posted publicly without leaking
+	 * tenant data.
+	 *
+	 * Best-effort: the host/library/folder/user replacements use the values
+	 * currently configured, so identifiers from a *previous* configuration
+	 * are only caught by the pattern rules (e-mail / IP / UUID / nonce). A
+	 * stale hostname that is not UUID-shaped can survive — raw exports remain
+	 * the sensitive artifact; see SECURITY.md.
 	 *
 	 * @return void Sends JSON response with anonymized log text.
 	 */
@@ -728,6 +735,19 @@ trait SBU_Admin_Ajax {
 		// Any remaining e-mails / IPs / UUIDs / UpdraftPlus nonces.
 		$masked = preg_replace( '/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/', '[USER]', $masked );
 		$masked = preg_replace( '/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/', '[IP]', $masked );
+		// IPv6 (PRIV-01): full 8-group form plus any :: -compressed form
+		// (::1, fe80::…, 2001:db8::1). Deliberately requires either 7 colons
+		// or a :: so it never matches log timestamps (14:30:00) or PHP
+		// Class::method references, which carry no double-colon-with-hex shape.
+		$masked = preg_replace(
+			'/\b(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}\b'   // full 8-group
+			. '|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}'  // :: in the middle
+			. '|::(?:[0-9A-Fa-f]{1,4}:){0,6}[0-9A-Fa-f]{1,4}'  // leading ::, incl. ::1
+			. '|(?:[0-9A-Fa-f]{1,4}:){1,7}:(?![0-9A-Za-z])'   // trailing ::
+			. '/',
+			'[IP]',
+			$masked
+		);
 		$masked = preg_replace( '/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i', '[LIB]', $masked );
 		$masked = preg_replace( '/(_)[a-f0-9]{12}(-)/i', '$1[NONCE]$2', $masked );
 

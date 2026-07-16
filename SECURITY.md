@@ -45,7 +45,12 @@ Please do **not** open a public GitHub issue for security vulnerabilities.
   include the site hostname via UpdraftPlus' default naming), and the user
   e-mail shown during connection tests. Use the *anonymized export* when
   sharing logs for support; raw exports leak the above to whoever receives
-  them. The crash-detection log entries introduced in 1.0.7 (WARNUNG "Worker
+  them. The anonymized export masks the configured host, library UUID,
+  folder and user, plus any e-mail, IPv4/IPv6 address, UUID and UpdraftPlus
+  nonce by pattern. Masking of host/library/folder/user uses the *current*
+  configuration, so identifiers from a previous configuration are only
+  caught if they match one of those patterns — the raw export stays the
+  sensitive artifact. The crash-detection log entries introduced in 1.0.7 (WARNUNG "Worker
   still abgestürzt … an gleicher Stelle", FEHLER "Datei nach wiederholten
   Worker-Abstürzen übersprungen") follow the same data shape: filename plus
   byte offset, both already masked by the existing sanitizer rules in the

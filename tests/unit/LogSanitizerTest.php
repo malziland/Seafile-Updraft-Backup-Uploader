@@ -115,6 +115,26 @@ final class LogSanitizerTest extends TestCase {
 		$this->assertStringContainsString( '[IP]', $masked );
 	}
 
+	public function test_masks_ipv6_addresses(): void {
+		foreach ( [ '::1', 'fe80::1', '2001:db8::1', '2001:0db8:0000:0000:0000:ff00:0042:8329' ] as $addr ) {
+			$masked = $this->exportWith( "[2026-04-18 10:00:06] remote {$addr} refused chunk" );
+			$this->assertStringNotContainsString( $addr, $masked, "IPv6 not masked: {$addr}" );
+			$this->assertStringContainsString( '[IP]', $masked );
+		}
+	}
+
+	/**
+	 * PRIV-01 guard: the IPv6 rule must not eat log timestamps (14:30:00) or
+	 * PHP Class::method references — both look colon-ish but carry no
+	 * ::-with-hex shape.
+	 */
+	public function test_ipv6_rule_preserves_timestamps_and_class_refs(): void {
+		$masked = $this->exportWith( '[2026-04-18 14:30:00] SBU_Plugin::process_queue_tick ran in 12:34:56' );
+		$this->assertStringContainsString( '14:30:00', $masked, 'timestamp must survive' );
+		$this->assertStringContainsString( 'SBU_Plugin::process_queue_tick', $masked, 'class ref must survive' );
+		$this->assertStringContainsString( '12:34:56', $masked, 'duration must survive' );
+	}
+
 	public function test_masks_unconfigured_uuid_as_library(): void {
 		$log    = '[2026-04-18 10:00:07] stray uuid aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee seen';
 		$masked = $this->exportWith( $log );
