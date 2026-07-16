@@ -1114,12 +1114,15 @@ trait SBU_Admin_Ajax {
 	/**
 	 * AJAX: Return a fresh nonce (for long-running sessions).
 	 *
+	 * Goes through the same capability + nonce gate as every other admin
+	 * endpoint (SEC-02). The client refreshes every 30 min — far inside the
+	 * 12–24 h nonce lifetime — so the current nonce is always still valid
+	 * when it asks for the next one.
+	 *
 	 * @return void Sends JSON response with new nonce.
 	 */
 	public function ajax_refresh_nonce() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'Zugriff verweigert.', 'seafile-updraft-backup-uploader' ) );
-		}
+		$this->verify_ajax_request();
 		wp_send_json_success( wp_create_nonce( SBU_NONCE ) );
 	}
 }

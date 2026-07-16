@@ -322,10 +322,11 @@
     setInterval(pollUploadStatus,5000);
     pollUploadStatus();
 
-    // Refresh nonce every 30 minutes to prevent expiry on long sessions
+    // Refresh nonce every 30 minutes to prevent expiry on long sessions.
+    // Goes through P() so the current nonce is sent and verified server-side
+    // (SEC-02) — 30 min is well inside the nonce lifetime, so this always
+    // succeeds while the tab stays open.
     setInterval(function(){
-        fetch(ajaxurl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'action=sbu_refresh_nonce'})
-        .then(function(r){return r.json();})
-        .then(function(d){if(d.success&&d.data)N=d.data;});
+        P('sbu_refresh_nonce').then(function(d){if(d.success&&d.data)N=d.data;}).catch(function(){});
     },1800000);
 })();
