@@ -4,6 +4,18 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.9] — 2026-07-16
+
+Hotfix zu 1.0.8. Ein Nach-Release-Audit deckte auf, dass der BUG-01-Fix (Restore-Korruption) unvollständig war.
+
+### Behoben
+
+- **BUG-01 vollständig abgesichert.** `SBU_Restore_Flow` enthielt zwei identische Prefix-Erkennungsblöcke; in 1.0.8 wurde nur der Hauptpfad auf `ok_prefix()` umgestellt, der zweite im One-shot-Fast-Retry nicht. Über den Retry-Zweig konnte ein Range-ignorierender Reverse-Proxy (HTTP 200 statt 206 bei Offset > 0) weiterhin eine ganze Datei per `ab`-Append hinter den bereits geschriebenen Prefix hängen — bei Backups ohne gespeicherten SHA1 unbemerkt. Beide Blöcke nutzen jetzt `ok_prefix()`; die Duplizierung ist beseitigt.
+
+### Geändert
+
+- Kommentar-Präzisierungen aus dem Nach-Audit (P3, kein Verhaltenseinfluss): IPv6-Maskierung kann hex-startende `Class::method` im Anon-Export über-maskieren (akzeptierter Safe-Trade-off); Nonce-Refresh scheitert nach Tab-Suspend jenseits der Nonce-Lebensdauer (Reload nötig); Lock-Ownership-Restrisiko (OPS-01) in docs/VERIFICATION.md dokumentiert.
+
 ## [1.0.8] — 2026-07-16
 
 Behebung der Findings aus dem Kurzaudit (KURZAUDIT 2026.11) sowie Aktualisierung der Entwickler-Werkzeuge.
