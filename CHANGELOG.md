@@ -4,9 +4,9 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unreleased]
+## [1.0.8] — 2026-07-16
 
-Behebung der Findings aus dem Kurzaudit (KURZAUDIT 2026.11) sowie Aktualisierung der Entwickler-Werkzeuge. Noch nicht veröffentlicht.
+Behebung der Findings aus dem Kurzaudit (KURZAUDIT 2026.11) sowie Aktualisierung der Entwickler-Werkzeuge.
 
 ### Sicherheit
 

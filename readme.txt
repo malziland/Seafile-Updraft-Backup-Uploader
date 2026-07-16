@@ -4,7 +4,7 @@ Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.2
-Stable tag: 1.0.7
+Stable tag: 1.0.8
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -100,6 +100,15 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 
 == Changelog ==
 
+= 1.0.8 =
+* **Sicherheit:** DOM-XSS über Seafile-gelieferte Bibliotheks-/Ordnernamen und Fehlertexte behoben — diese wurden im Admin-Bereich per `innerHTML` gesetzt; ein bösartiger oder mehrbenutzerfähiger Seafile-Server konnte darüber Schadcode in die WordPress-Adminoberfläche einschleusen. Auswahllisten und Ergebnis-Boxen werden jetzt über `textContent` aufgebaut.
+* **Sicherheit:** Fehlende Nonce-Prüfung am Nonce-Refresh-Endpunkt (`sbu_refresh_nonce`) geschlossen — er läuft jetzt durch dieselbe Prüfung wie alle anderen Admin-Endpunkte.
+* **Fix:** Beschädigte Wiederherstellung bei Reverse-Proxys, die Range-Anfragen ignorieren. Antwortete der Proxy auf einen fortgesetzten Teil-Download mit der ganzen Datei (HTTP 200 statt 206), wurde diese an die bereits geschriebenen Bytes angehängt — eine still beschädigte Wiederherstellung. Solche Antworten werden oberhalb von Offset 0 jetzt verworfen und der Block erneut versucht.
+* **Fix:** „Pause" bzw. „Abbrechen" konnte verloren gehen, wenn zeitgleich ein Worker-Absturz, Auth-Fehler oder Queue-Timeout auftrat. Diese Schreibvorgänge bewahren den zwischenzeitlich gesetzten Status jetzt.
+* **Fix:** Hängende Upload-Queue nach hartem PHP-Prozess-Tod — der Upload-Pfad hat jetzt (wie der Restore-Pfad) ein Sicherheitsnetz, das das Queue-Lock freigibt und die Verarbeitung sofort wieder anstößt, statt bis zum Ablauf der Lock-Frist zu warten.
+* **Datenschutz:** IPv6-Adressen werden im anonymisierten Protokoll-Export jetzt ebenfalls maskiert (bisher nur IPv4), ohne Log-Zeitstempel zu zerstören.
+* **Intern:** Dokumentation auf den tatsächlichen Code-Stand korrigiert, Entwickler-Werkzeuge aktualisiert (keine Auswirkung auf das Plugin). 132 Tests / 374 Assertions, alle grün.
+
 = 1.0.7 =
 * **Fix:** Worker-Crash-Notbremse — verhindert den 17-Stunden-Resume-Loop, der in Produktion auftrat, wenn ein bestimmter Chunk den PHP-Prozess wiederholt killte (häufig bei großen Uploads auf Hostern wie Hostinger mit harten `max_execution_time`/Memory-Limits). Neues Verhalten: (a) bei wiederholtem stillem Worker-Tod am **gleichen Byte-Offset** wird die Chunk-Größe für die betroffene Datei automatisch halbiert (Untergrenze 4 MiB); (b) wenn auch mit der minimalen Chunk-Größe weiter dieselbe Stelle crasht, wird die Datei als Fehler markiert und die Queue läuft mit den nächsten Dateien weiter; (c) hartes Maximum von 5 Crash-Wiederaufnahmen pro Datei. Vorher blockierte ein einzelner kaputter Chunk die gesamte Queue bis zum 17,8-h-Gesamt-Timeout — und die nachfolgenden Backup-Dateien wurden überhaupt nicht hochgeladen.
 * **Diagnose:** Neuer Log-Eintrag „Worker still abgestürzt … an gleicher Stelle — Chunk-Größe auf X MB reduziert" macht die adaptive Verkleinerung im Aktivitätsprotokoll sichtbar. Skip-Fall wird als `FEHLER: Datei nach wiederholten Worker-Abstürzen übersprungen` geloggt.
@@ -130,6 +139,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.8 =
+Empfohlenes Sicherheits- und Stabilitäts-Update. Behebt zwei XSS-Wege im Admin-Bereich (bösartige/mehrbenutzerfähige Seafile-Server), eine mögliche Beschädigung von Wiederherstellungen hinter Range-ignorierenden Proxys sowie einen möglichen Verlust von „Pause"/„Abbrechen". Keine Migration nötig.
 
 = 1.0.7 =
 Wichtiger Stabilitäts-Fix für große Uploads: bisher konnte ein einzelner Chunk, der den PHP-Prozess wiederholt killte, die Backup-Queue bis zu 17 Stunden blockieren (und alle nachfolgenden Backup-Dateien wurden gar nicht hochgeladen). Neue Notbremse halbiert bei Wiederholungs-Absturz am gleichen Byte automatisch die Chunk-Größe; bleibt die Datei trotzdem stecken, wird sie übersprungen statt die ganze Queue zu blockieren. Keine Migration nötig.
