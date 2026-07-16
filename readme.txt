@@ -4,7 +4,7 @@ Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.2
-Stable tag: 1.0.9
+Stable tag: 1.0.10
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -100,6 +100,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 
 == Changelog ==
 
+= 1.0.10 =
+* **Reliability:** Das Queue-Lock erhält einen Besitz-Nachweis (Ownership-Token). Bisher konnte in einem sehr engen Zeitfenster ein abgestürzter Verarbeitungs-Prozess beim Aufräumen versehentlich das Lock eines bereits nachgerückten Prozesses freigeben — mit dem Risiko, dass zwei Prozesse kurzzeitig parallel dieselbe Queue bearbeiten. Ein Prozess gibt jetzt nur noch das Lock frei, das er selbst hält; der bewusste Abbruch einer laufenden Queue durch ein neues Backup nutzt einen separaten Force-Pfad. Behebt das letzte offene Restrisiko aus dem internen Audit. 140 Tests / 389 Assertions, alle grün.
+
 = 1.0.9 =
 * **Fix (wichtig):** Der Korruptionsschutz für Wiederherstellungen aus 1.0.8 war unvollständig. Der Restore-Code enthielt zwei identische Stellen für die Auswertung von Teil-Downloads; in 1.0.8 wurde nur die Hauptstelle abgesichert, die zweite (im Sofort-Wiederholungs-Zweig) nicht. Dadurch konnte die in 1.0.8 behobene Beschädigung bei Range-ignorierenden Reverse-Proxys über den Wiederholungs-Pfad weiterhin auftreten — bei Backups ohne gespeicherte Prüfsumme sogar unbemerkt. Beide Stellen nutzen jetzt dieselbe abgesicherte Auswertung. **Wer 1.0.8 installiert hat, sollte auf 1.0.9 aktualisieren.**
 * **Intern:** Drei Kommentar-Präzisierungen aus dem Nach-Audit (IPv6-Maskierung, Nonce-Refresh nach langem Tab-Schlaf, dokumentiertes Lock-Restrisiko). Kein Verhaltenseinfluss. 132 Tests / 374 Assertions, alle grün.
@@ -143,6 +146,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.10 =
+Reliability-Verbesserung am Queue-Lock (Ownership-Token) — schließt ein enges Nebenläufigkeits-Restrisiko. Keine Migration nötig.
 
 = 1.0.9 =
 Wichtiger Nachtrag zu 1.0.8: Der Korruptionsschutz für Wiederherstellungen war dort unvollständig (eine zweite Code-Stelle blieb ungesichert). Wer 1.0.8 installiert hat, sollte auf 1.0.9 aktualisieren. Keine Migration nötig.

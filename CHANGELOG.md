@@ -4,6 +4,14 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.10] — 2026-07-16
+
+Behebt das letzte offene Restrisiko aus dem Re-Audit (OPS-01).
+
+### Behoben
+
+- **Queue-Lock mit Ownership-Token (OPS-01).** `release_lock()` löschte das Lock bedingungslos. Stirbt ein Tick per Timeout-Fatal und hat ein zweiter Tick das inzwischen abgelaufene Lock übernommen, konnte der Shutdown-Handler des ersten Ticks das Lock des zweiten freigeben — ein enges Nebenläufigkeits-Fenster mit Risiko kurzzeitiger Doppelverarbeitung (vorbestehend in Upload- und Restore-Flow). `acquire_lock()` schreibt jetzt einen Per-Acquire-Token; `release_lock()` löscht nur ein Lock mit eigenem Token. Der bewusste Abbruch einer laufenden Queue durch ein neues Backup (`on_backup_complete`) nutzt das neue `force_release_lock()`. Das Lock-Format wechselt von einem reinen Integer auf `array( exp, tok )`; `acquire_lock()` liest beide Formen, sodass Mid-Upgrade-Queues nicht hängen bleiben. Abgesichert durch `LockOwnershipTest` (8 Fälle).
+
 ## [1.0.9] — 2026-07-16
 
 Hotfix zu 1.0.8. Ein Nach-Release-Audit deckte auf, dass der BUG-01-Fix (Restore-Korruption) unvollständig war.
