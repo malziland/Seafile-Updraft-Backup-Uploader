@@ -155,8 +155,11 @@ trait SBU_Restore_Flow {
 			$t = SBU_Seafile_API::get_token( $s['url'], $s['user'], $pw, true );
 			if ( is_wp_error( $t ) ) {
 				$queue['status'] = 'error';
-				update_option( SBU_QUEUE, $queue, false );
-				$this->activity_logger->log( 'FEHLER', __( 'Restore abgebrochen: Auth fehlgeschlagen', 'seafile-updraft-backup-uploader' ) );
+				// BUG-02: paused/aborted, das während des Token-Requests
+				// gesetzt wurde, bleibt erhalten; Log nur bei echtem 'error'.
+				if ( 'error' === $this->safe_queue_update( $queue ) ) {
+					$this->activity_logger->log( 'FEHLER', __( 'Restore abgebrochen: Auth fehlgeschlagen', 'seafile-updraft-backup-uploader' ) );
+				}
 				return;
 			}
 		}

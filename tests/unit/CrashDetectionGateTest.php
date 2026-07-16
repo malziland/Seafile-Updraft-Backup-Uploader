@@ -276,6 +276,56 @@ final class CrashDetectionGateTest extends TestCase {
         $this->assertStringContainsString( 'backup-db.gz', $log, 'log must identify which file hung' );
     }
 
+    /**
+     * BUG-02 regression: the crash-recovery write must not clobber a status
+     * a concurrent request set in the DB while this tick was mid-flight. The
+     * detector works off an in-memory 'uploading' snapshot, but if the user
+     * pressed Pause in the meantime the DB row is already 'paused' — the
+     * recovery write goes through safe_queue_update(), which preserves it.
+     */
+    public function test_crash_recovery_preserves_concurrent_pause(): void {
+        // The snapshot this tick is working with — still 'uploading'.
+        $in_memory = $this->baseQueue( [ 'last_activity' => time() - 500 ] );
+        // Meanwhile the user pressed Pause: the DB row is already 'paused'
+        // and carries the far-future gate that Pause installs.
+        $this->options[ SBU_QUEUE ] = [
+            'status'               => 'paused',
+            'files'                => [ [ 'path' => '/srv/backup-db.gz', 'retries' => 0, 'offset' => 0 ] ],
+            'file_idx'             => 0,
+            'ok'                   => 0,
+            'err'                  => 0,
+            'total_bytes'          => 0,
+            'next_allowed_tick_ts' => time() + 31_536_000,
+        ];
+
+        $ret = $this->callPrivate( $this->plugin, 'detect_worker_crash_and_defer', [ $in_memory ] );
+        $this->assertTrue( $ret, 'crash is still detected from the in-memory snapshot' );
+        $this->assertSame( 'paused', $this->options[ SBU_QUEUE ]['status'], 'recovery write must not un-pause the queue' );
+    }
+
+    /**
+     * BUG-02, give-up branch: skipping a repeatedly-crashing file also runs
+     * through safe_queue_update(), so a concurrent pause survives here too.
+     */
+    public function test_crash_skip_preserves_concurrent_pause(): void {
+        $in_memory = $this->baseQueue( [
+            'last_activity' => time() - 10_000,
+            'files'         => [ [ 'path' => '/srv/backup-uploads.zip', 'retries' => 42, 'offset' => 0 ] ],
+        ] );
+        $this->options[ SBU_QUEUE ] = [
+            'status'               => 'paused',
+            'files'                => [ [ 'path' => '/srv/backup-uploads.zip', 'retries' => 42, 'offset' => 0 ] ],
+            'file_idx'             => 0,
+            'ok'                   => 0,
+            'err'                  => 0,
+            'total_bytes'          => 0,
+            'next_allowed_tick_ts' => time() + 31_536_000,
+        ];
+
+        $this->callPrivate( $this->plugin, 'detect_worker_crash_and_defer', [ $in_memory ] );
+        $this->assertSame( 'paused', $this->options[ SBU_QUEUE ]['status'], 'skip write must not un-pause the queue' );
+    }
+
     // =====================================================================
     // Fixtures
     // =====================================================================

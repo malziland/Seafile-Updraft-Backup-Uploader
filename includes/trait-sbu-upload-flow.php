@@ -322,11 +322,16 @@ trait SBU_Upload_Flow {
 		if ( $started > 0 && ( time() - $started ) > $timeout ) {
 			$hours           = round( ( time() - $started ) / 3600, 1 );
 			$queue['status'] = 'error';
-			update_option( SBU_QUEUE, $queue, false );
-			wp_clear_scheduled_hook( SBU_CRON_HOOK );
-			delete_transient( 'sbu_progress' );
-			$this->activity_logger->log( 'FEHLER', "Queue-Timeout nach {$hours}h: {$queue['ok']} OK, {$queue['err']} Fehler" );
-			$this->mail_notifier->send( false, "Queue timed out after {$hours}h." );
+			// safe_queue_update() bewahrt ein nebenläufiges paused/aborted
+			// (BUG-02): der Timeout-Abbruch darf einen frischen Nutzer-Intent
+			// nicht überschreiben. Folge-Nebenwirkungen nur, wenn wirklich
+			// 'error' geschrieben wurde.
+			if ( 'error' === $this->safe_queue_update( $queue ) ) {
+				wp_clear_scheduled_hook( SBU_CRON_HOOK );
+				delete_transient( 'sbu_progress' );
+				$this->activity_logger->log( 'FEHLER', "Queue-Timeout nach {$hours}h: {$queue['ok']} OK, {$queue['err']} Fehler" );
+				$this->mail_notifier->send( false, "Queue timed out after {$hours}h." );
+			}
 			return;
 		}
 
@@ -358,9 +363,12 @@ trait SBU_Upload_Flow {
 			$t = SBU_Seafile_API::get_token( $s['url'], $s['user'], $pw, true );
 			if ( is_wp_error( $t ) ) {
 				$queue['status'] = 'error';
-				update_option( SBU_QUEUE, $queue, false );
-				$this->activity_logger->log( 'FEHLER', __( 'Upload abgebrochen: Auth fehlgeschlagen', 'seafile-updraft-backup-uploader' ) );
-				$this->mail_notifier->send( false, 'Auth failed during upload.' );
+				// BUG-02: ein während des Token-Requests gesetztes paused/
+				// aborted bleibt erhalten; Log/Mail nur bei echtem 'error'.
+				if ( 'error' === $this->safe_queue_update( $queue ) ) {
+					$this->activity_logger->log( 'FEHLER', __( 'Upload abgebrochen: Auth fehlgeschlagen', 'seafile-updraft-backup-uploader' ) );
+					$this->mail_notifier->send( false, 'Auth failed during upload.' );
+				}
 				return;
 			}
 		}

@@ -879,7 +879,10 @@ final class SBU_Plugin {
 					$off_mb
 				)
 			);
-			update_option( SBU_QUEUE, $queue, false );
+			// safe_queue_update() statt direktem update_option: ein
+			// nebenläufig gesetztes paused/aborted darf nicht durch den
+			// Crash-Skip-Write verloren gehen (BUG-02).
+			$this->safe_queue_update( $queue );
 			$this->queue_engine->schedule_next_tick( 30 );
 			$this->queue_engine->spawn_next_tick();
 			return true;
@@ -919,7 +922,9 @@ final class SBU_Plugin {
 		$queue['files'][ $idx ]['crashes_at_offset'] = $crashes_here;
 		$queue['next_allowed_tick_ts']               = time() + $delay;
 		$queue['last_activity']                      = time();
-		update_option( SBU_QUEUE, $queue, false );
+		// safe_queue_update() bewahrt ein nebenläufiges paused/aborted; der
+		// Backoff-Write darf den Nutzer-Intent nicht überschreiben (BUG-02).
+		$this->safe_queue_update( $queue );
 		$this->queue_engine->schedule_next_tick( $delay );
 		return true;
 	}
