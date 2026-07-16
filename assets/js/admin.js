@@ -52,6 +52,10 @@
     function showProgress(indeterminate){var p=document.getElementById('sp');p.style.display='block';if(indeterminate)p.classList.add('indeterminate');else p.classList.remove('indeterminate');document.getElementById('spf').style.width='0%';}
     function hideProgress(){var p=document.getElementById('sp');p.style.display='none';p.classList.remove('indeterminate');document.getElementById('spf').style.width='0%';}
 
+    // Render a <pre> box with untrusted text safely — textContent, never
+    // innerHTML, so Seafile-supplied error text can't inject markup (SEC-01).
+    function setPre(el,text){el.textContent='';var pre=document.createElement('pre');pre.style.cssText='margin:0;white-space:pre-wrap;font-size:13px';pre.textContent=text;el.appendChild(pre);}
+
     // Log category filter. Keeps the current choice across refreshes and
     // applies it client-side — the server always ships the full log so the
     // filter is instantly reversible.
@@ -77,10 +81,10 @@
     // Refresh activity log via AJAX
     function refreshLog(){P('sbu_get_log').then(function(d){if(d.success){var el=document.getElementById('alc');if(el){el.innerHTML=d.data||'<span class="dim">'+sbuAdmin.i18n.noActivity+'</span>';applyLogFilter();}}}).catch(function(){});}
 
-    window.sA=function(a,b){var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent=wait;if(b)b.disabled=true;showProgress(true);var extra=(a==='sbu_test')?getFormCreds()+'&sbu_lib='+encodeURIComponent(libSelect.value)+'&sbu_folder='+encodeURIComponent(folderSelect.value):'';P(a,extra).then(function(d){hideProgress();e.className=d.success?'ok':'er';e.innerHTML='<pre style="margin:0;white-space:pre-wrap;font-size:13px">'+(d.data||'')+'</pre>';if(b)b.disabled=false;if(a==='sbu_upload'){document.getElementById('sbu-upb').style.display='none';stallCount=0;loadBL(true);refreshLog();}if(a==='sbu_test'){loadBL(true);refreshLog();}}).catch(function(x){hideProgress();e.className='er';e.textContent=x.message||'Verbindungsfehler';if(b)b.disabled=false;if(a==='sbu_upload'){document.getElementById('sbu-upb').style.display='none';stallCount=0;}});};
+    window.sA=function(a,b){var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent=wait;if(b)b.disabled=true;showProgress(true);var extra=(a==='sbu_test')?getFormCreds()+'&sbu_lib='+encodeURIComponent(libSelect.value)+'&sbu_folder='+encodeURIComponent(folderSelect.value):'';P(a,extra).then(function(d){hideProgress();e.className=d.success?'ok':'er';setPre(e,d.data||'');if(b)b.disabled=false;if(a==='sbu_upload'){document.getElementById('sbu-upb').style.display='none';stallCount=0;loadBL(true);refreshLog();}if(a==='sbu_test'){loadBL(true);refreshLog();}}).catch(function(x){hideProgress();e.className='er';e.textContent=x.message||'Verbindungsfehler';if(b)b.disabled=false;if(a==='sbu_upload'){document.getElementById('sbu-upb').style.display='none';stallCount=0;}});};
     window.sDe=function(dir){if(!confirm(dir+'?'))return;var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent='...';P('sbu_delete','&dir='+encodeURIComponent(dir)).then(function(d){e.className=d.success?'ok':'er';e.textContent=d.data||'';if(d.success){loadBL(true);refreshLog();}});};
     window.sbuToggle=function(id,link){var el=document.getElementById(id);if(!el)return;var show=el.style.display==='none';el.style.display=show?'block':'none';link.textContent=show?sbuAdmin.i18n.hide:sbuAdmin.i18n.show;};
-    window.sDlAll=function(dir){if(!confirm(sbuAdmin.i18n.restoreConfirm))return;var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent=sbuAdmin.i18n.downloadingAll;showProgress(true);P('sbu_download_all','&dir='+encodeURIComponent(dir)).then(function(d){hideProgress();if(d.success){e.className='ok';e.innerHTML='<pre style="margin:0;white-space:pre-wrap;font-size:13px">'+(d.data||'')+'</pre>';}else{e.className='ld';e.innerHTML='<pre style="margin:0;white-space:pre-wrap;font-size:13px">'+(d.data||'')+'\n\n'+sbuAdmin.i18n.downloadProgress+'</pre>';}refreshLog();}).catch(function(x){hideProgress();e.className='ld';e.textContent=sbuAdmin.i18n.downloadTimeout;});};
+    window.sDlAll=function(dir){if(!confirm(sbuAdmin.i18n.restoreConfirm))return;var e=document.getElementById('sr');e.className='ld';e.style.display='block';e.textContent=sbuAdmin.i18n.downloadingAll;showProgress(true);P('sbu_download_all','&dir='+encodeURIComponent(dir)).then(function(d){hideProgress();if(d.success){e.className='ok';setPre(e,d.data||'');}else{e.className='ld';setPre(e,(d.data||'')+'\n\n'+sbuAdmin.i18n.downloadProgress);}refreshLog();}).catch(function(x){hideProgress();e.className='ld';e.textContent=sbuAdmin.i18n.downloadTimeout;});};
 
     // Export log as .txt download
     window.sbuExportLog=function(){P('sbu_export_log').then(function(d){if(d.success&&d.data){var b=new Blob([d.data],{type:'text/plain'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='seafile-backup-log-'+new Date().toISOString().slice(0,10)+'.txt';a.click();}}).catch(function(x){alert(x.message);});};
@@ -174,8 +178,13 @@
             libSelect.innerHTML='<option value="">— Bibliothek wählen —</option>';
             var cur = sbuAdmin.curLib;
             libs.forEach(function(l){
-                var sel=l.name===cur?' selected':'';
-                libSelect.innerHTML+='<option value="'+l.name+'"'+sel+'>'+l.name+' ('+Math.round(l.size/1024/1024)+' MB)</option>';
+                // Build the option via textContent, not innerHTML — a library
+                // name is Seafile-supplied and could carry markup (SEC-01).
+                var opt=document.createElement('option');
+                opt.value=l.name;
+                opt.textContent=l.name+' ('+Math.round(l.size/1024/1024)+' MB)';
+                if(l.name===cur)opt.selected=true;
+                libSelect.appendChild(opt);
             });
             libSelect.disabled=false;
             pickerStatus(libStatus,'ok','✓ '+libs.length+' Bibliotheken');
@@ -204,8 +213,14 @@
             folderSelect.innerHTML='<option value="/">/ (Stammverzeichnis)</option>';
             var cur = sbuAdmin.curFolder;
             dirs.forEach(function(dn){
-                var val='/'+dn;var sel=val===cur?' selected':'';
-                folderSelect.innerHTML+='<option value="'+val+'"'+sel+'>'+val+'</option>';
+                // textContent, not innerHTML — a folder name is Seafile-supplied
+                // and could carry markup (SEC-01).
+                var val='/'+dn;
+                var opt=document.createElement('option');
+                opt.value=val;
+                opt.textContent=val;
+                if(val===cur)opt.selected=true;
+                folderSelect.appendChild(opt);
             });
             folderSelect.disabled=false;
             pickerStatus(folderStatus,'ok','✓ '+dirs.length+' Ordner');
