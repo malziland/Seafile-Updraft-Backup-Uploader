@@ -27,7 +27,7 @@ Alle sieben Findings des Abnahme-Kurzaudits behoben; Nachweise:
 
 | Finding | Fix-Nachweis |
 |---|---|
-| BUG-01 (Restore-Korruption bei HTTP-200) | `RestoreOkPrefixTest` (5 Fälle) |
+| BUG-01 (Restore-Korruption bei HTTP-200) | `RestoreOkPrefixTest` (5 Fälle); Re-Audit deckte einen zweiten, im ersten Anlauf übersehenen Prefix-Block im Retry-Pfad auf — in v1.0.9 ebenfalls auf `ok_prefix()` umgestellt, Duplizierung beseitigt |
 | BUG-02 (Pause-Verlust bei Terminal-Write) | `CrashDetectionGateTest::test_crash_recovery_preserves_concurrent_pause` + `…skip…` |
 | SEC-01 (DOM-XSS) | Picker/Boxen über `textContent`; `node --check` grün |
 | SEC-02 (Nonce-Refresh) | `verify_ajax_request()` im Handler; JS sendet Nonce über `P()` |
@@ -51,6 +51,7 @@ Alle sieben Findings des Abnahme-Kurzaudits behoben; Nachweise:
 | Kein automatisierter A11y-Check | Admin-UI hinter Login, kein öffentliches Frontend; manueller Tastatur-Smoketest als Ersatz | malziland | v1.1.0 / 2027-01 |
 | Kein Toolchain-Version-File | Kein Versionsmanager im Einsatz; Anker sind composer.json + CI-Matrix | malziland | bei Team-Erweiterung |
 | PHPUnit auf 11.x, php_codesniffer auf 3.x gepinnt (keine Major-Updates) | PHPUnit 13 zieht die PHP-8.4-Toolchain nach und bräche die PHP-8.2-Testabdeckung; php_codesniffer 4 wird von wpcs 3.4.0 / phpcompatibility noch nicht unterstützt | malziland | sobald WPCS 4 erscheint bzw. die PHP-Mindestversion angehoben wird |
+| Queue-Lock ohne Ownership-Token (OPS-01-Restrisiko) | `release_lock()` prüft keinen Owner; ein Shutdown-Handler könnte theoretisch ein vom nächsten Tick frisch geholtes Lock freigeben (sub-Sekunden-Fenster bei Timeout-Fatal). Vorbestehend seit dem Restore-Flow, durch OPS-01 auch im Upload-Flow. Kein neuer Fehlertyp. | malziland | künftiges Finding — Fix wäre ein Lock-Ownership-Token (betrifft beide Flows) |
 
 ## Pflege
 

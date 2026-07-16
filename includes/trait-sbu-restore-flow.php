@@ -555,23 +555,16 @@ trait SBU_Restore_Flow {
 							$results  = SBU_Seafile_API::download_chunks_parallel( $t, $ranges, $chunk_timeout, $deadline_ts );
 							$batch_dt = microtime( true ) - $batch_t0;
 							ksort( $results );
-							$prefix_ok_count = 0;
-							$prefix_bytes    = 0;
-							$got_whole_file  = false;
-							foreach ( $results as $r ) {
-								if ( empty( $r['ok'] ) ) {
-									break;
-								}
-								++$prefix_ok_count;
-								$prefix_bytes += (int) ( $r['bytes'] ?? 0 );
-								if ( ( $r['code'] ?? 0 ) === 200 ) {
-									$got_whole_file = true;
-									break;
-								}
-							}
-							$has_error      = $prefix_ok_count < count( $results );
-							$full_batch_ok  = ! $has_error;
-							$partial_prefix = $prefix_ok_count > 0 && $has_error;
+							// BUG-01 gilt auch hier: derselbe offset>0 + HTTP-200-
+							// Guard wie im Hauptpfad, sonst würde der Retry-Zweig
+							// eine ganze Datei per ab-Append committen.
+							$prefix          = $this->ok_prefix( $results, $offset );
+							$prefix_ok_count = $prefix['count'];
+							$prefix_bytes    = $prefix['bytes'];
+							$got_whole_file  = $prefix['whole_file'];
+							$has_error       = $prefix_ok_count < count( $results );
+							$full_batch_ok   = ! $has_error;
+							$partial_prefix  = $prefix_ok_count > 0 && $has_error;
 						}
 					}
 				}

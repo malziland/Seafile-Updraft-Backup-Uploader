@@ -339,8 +339,9 @@
 
     // Refresh nonce every 30 minutes to prevent expiry on long sessions.
     // Goes through P() so the current nonce is sent and verified server-side
-    // (SEC-02) — 30 min is well inside the nonce lifetime, so this always
-    // succeeds while the tab stays open.
+    // (SEC-02) — 30 min is well inside the nonce lifetime, so this succeeds
+    // as long as the tab isn't suspended past the nonce lifetime; after such
+    // a long sleep a page reload is needed (standard WordPress behaviour).
     setInterval(function(){
         P('sbu_refresh_nonce').then(function(d){if(d.success&&d.data)N=d.data;}).catch(function(){});
     },1800000);

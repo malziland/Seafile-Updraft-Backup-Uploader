@@ -736,9 +736,12 @@ trait SBU_Admin_Ajax {
 		$masked = preg_replace( '/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/', '[USER]', $masked );
 		$masked = preg_replace( '/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/', '[IP]', $masked );
 		// IPv6 (PRIV-01): full 8-group form plus any :: -compressed form
-		// (::1, fe80::…, 2001:db8::1). Deliberately requires either 7 colons
-		// or a :: so it never matches log timestamps (14:30:00) or PHP
-		// Class::method references, which carry no double-colon-with-hex shape.
+		// (::1, fe80::…, 2001:db8::1). Requires either 7 colons or a :: so it
+		// never touches log timestamps (14:30:00), SHA hashes or UUIDs. A PHP
+		// Class::method whose method name starts with hex chars (Db::add,
+		// Foo::abc) CAN be over-masked to [IP] — accepted trade-off: this is
+		// the human-readable support export only, and over-masking leaks
+		// nothing, whereas a real IPv6 slipping through would.
 		$masked = preg_replace(
 			'/\b(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}\b'   // full 8-group
 			. '|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}'  // :: in the middle
@@ -1136,8 +1139,10 @@ trait SBU_Admin_Ajax {
 	 *
 	 * Goes through the same capability + nonce gate as every other admin
 	 * endpoint (SEC-02). The client refreshes every 30 min — far inside the
-	 * 12–24 h nonce lifetime — so the current nonce is always still valid
-	 * when it asks for the next one.
+	 * 12–24 h nonce lifetime — so the current nonce is still valid when it
+	 * asks for the next one, unless the tab was suspended longer than the
+	 * nonce lifetime; after such a long sleep the refresh fails and a page
+	 * reload is required (standard WordPress nonce behaviour).
 	 *
 	 * @return void Sends JSON response with new nonce.
 	 */
