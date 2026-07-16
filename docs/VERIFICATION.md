@@ -5,20 +5,35 @@ STANDARD-Anforderung und jede aktive Profilpflicht trägt hier einen
 belastbaren Nachweis (Befehl + Ergebnis + Anker). Ausbaustufe: **STANDARD**
 (siehe [ADR-0001](adr/ADR-0001-ausbaustufe-profile-toolchain.md)).
 
-Referenz-Stand der letzten Vollverifikation: Commit `16fdc07`,
-Toolchain PHP 8.5.8 lokal / CI-Matrix PHP 8.2–8.4, Datum 2026-07-16.
+Referenz-Stand der letzten Vollverifikation: Commit `HEAD` (Audit-Remediation
++ Dep-Update), Toolchain PHP 8.5.8 lokal / CI-Matrix PHP 8.2–8.4,
+Datum 2026-07-16.
 
 | Anforderung | Evidenz / Befehl | Ergebnis (Anker) |
 |---|---|---|
-| Reproduzierbarer Build (Zip) | `composer build` → `dist/seafile-updraft-backup-uploader-<version>.zip` | Erfolg; 31 Einträge, Top-Level-Slug-Ordner, nur Runtime-Dateien; `16fdc07` |
-| Tests | `composer test` (`./vendor/bin/phpunit`) | **123 Tests, 343 Assertions, OK**; `16fdc07` |
-| Statische Analyse | `composer phpstan` (Level 5, phpstan.neon.dist) | **No errors**; `16fdc07` |
-| Coding Standards | `composer phpcs` (WordPress, phpcs.xml.dist) | **0 Errors, 0 Warnings**; `16fdc07` |
-| Syntax-Lint | `composer lint` | 31 Dateien, keine Syntaxfehler; `16fdc07` |
-| Secret-Scan | `gitleaks detect --no-banner --redact` (lokal) + CI-Job `gitleaks` | **no leaks found**, 19 Commits gescannt; `16fdc07` |
-| Dependency-Audit | `composer audit --locked` + CI-Job `audit` | **No security vulnerability advisories found**; `16fdc07` |
+| Reproduzierbarer Build (Zip) | `composer build` → `dist/seafile-updraft-backup-uploader-<version>.zip` | Erfolg; 31 Einträge, Top-Level-Slug-Ordner, nur Runtime-Dateien |
+| Tests | `composer test` (`./vendor/bin/phpunit`) | **132 Tests, 374 Assertions, OK** |
+| Statische Analyse | `composer phpstan` (Level 5, phpstan.neon.dist) | **No errors** (PHPStan 2.2.5) |
+| Coding Standards | `composer phpcs` (WordPress, phpcs.xml.dist) | **0 Errors, 0 Warnings** (WPCS 3.4.0) |
+| Syntax-Lint | `composer lint` | keine Syntaxfehler |
+| Secret-Scan | `gitleaks detect --no-banner --redact` (lokal) + CI-Job `gitleaks` | **no leaks found** |
+| Dependency-Audit | `composer audit --locked` + CI-Job `audit` | **No security vulnerability advisories found** |
 | Rollback-Probe (Worktree) | `git worktree add /tmp/sbu-rollback v1.0.7 && composer install && phpunit` | v1.0.7 aus sich heraus baubar, **123 Tests OK** (`5572f7e`), Worktree entfernt; durchgeführt 2026-07-16 |
-| CI grün | `.github/workflows/ci.yml` — lint (8.2/8.3/8.4), phpcs, phpstan, phpunit (8.2/8.3/8.4), gitleaks, audit | lokal alle Gates grün auf `16fdc07`; CI-Bestätigung nach Push |
+| CI grün | `.github/workflows/ci.yml` — lint (8.2/8.3/8.4), phpcs, phpstan, phpunit (8.2/8.3/8.4), gitleaks, audit | lokal alle Gates grün; CI-Bestätigung nach Push |
+
+## Audit-Remediation (KURZAUDIT 2026.11)
+
+Alle sieben Findings des Abnahme-Kurzaudits behoben; Nachweise:
+
+| Finding | Fix-Nachweis |
+|---|---|
+| BUG-01 (Restore-Korruption bei HTTP-200) | `RestoreOkPrefixTest` (5 Fälle) |
+| BUG-02 (Pause-Verlust bei Terminal-Write) | `CrashDetectionGateTest::test_crash_recovery_preserves_concurrent_pause` + `…skip…` |
+| SEC-01 (DOM-XSS) | Picker/Boxen über `textContent`; `node --check` grün |
+| SEC-02 (Nonce-Refresh) | `verify_ajax_request()` im Handler; JS sendet Nonce über `P()` |
+| OPS-01 (Upload-Shutdown-Netz) | `register_shutdown_function` symmetrisch zum Restore-Flow |
+| PRIV-01 (IPv6-Maskierung) | `LogSanitizerTest` +2 (IPv6 + Zeitstempel-Schutz) |
+| DOC-01 (Doku-Drift) | ARCHITECTURE.md/SECURITY.md korrigiert |
 
 ## Profilpflichten
 
@@ -35,6 +50,7 @@ Toolchain PHP 8.5.8 lokal / CI-Matrix PHP 8.2–8.4, Datum 2026-07-16.
 | Keine SBOM im Build | Artefakt ohne Runtime-Dependencies | malziland | bei erster Runtime-Dependency |
 | Kein automatisierter A11y-Check | Admin-UI hinter Login, kein öffentliches Frontend; manueller Tastatur-Smoketest als Ersatz | malziland | v1.1.0 / 2027-01 |
 | Kein Toolchain-Version-File | Kein Versionsmanager im Einsatz; Anker sind composer.json + CI-Matrix | malziland | bei Team-Erweiterung |
+| PHPUnit auf 11.x, php_codesniffer auf 3.x gepinnt (keine Major-Updates) | PHPUnit 13 zieht die PHP-8.4-Toolchain nach und bräche die PHP-8.2-Testabdeckung; php_codesniffer 4 wird von wpcs 3.4.0 / phpcompatibility noch nicht unterstützt | malziland | sobald WPCS 4 erscheint bzw. die PHP-Mindestversion angehoben wird |
 
 ## Pflege
 

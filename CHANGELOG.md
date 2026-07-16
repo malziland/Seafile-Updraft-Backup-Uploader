@@ -4,6 +4,30 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+Behebung der Findings aus dem Kurzaudit (KURZAUDIT 2026.11) sowie Aktualisierung der Entwickler-Werkzeuge. Noch nicht veröffentlicht.
+
+### Sicherheit
+
+- **DOM-XSS über Seafile-gelieferte Namen behoben (SEC-01).** Bibliotheks- und Ordnernamen sowie Seafile-Fehlertexte wurden im Admin-Bereich über `innerHTML` eingesetzt. Ein bösartiger oder mehrbenutzerfähiger Seafile-Server konnte darüber Schadcode in die WordPress-Adminoberfläche einschleusen. Die Auswahllisten werden jetzt über `textContent` aufgebaut, Ergebnis-Boxen ebenfalls.
+- **Fehlende Nonce-Prüfung am Nonce-Refresh-Endpunkt geschlossen (SEC-02).** `sbu_refresh_nonce` prüfte nur die Berechtigung, nicht die Nonce; jetzt läuft er durch dieselbe Prüfung wie alle anderen Admin-Endpunkte.
+
+### Behoben
+
+- **Beschädigte Wiederherstellung bei Range-ignorierenden Proxys (BUG-01).** Antwortete ein Reverse-Proxy auf eine fortgesetzte Teil-Download-Anfrage mit der ganzen Datei (HTTP 200 statt 206), wurde diese an die bereits geschriebenen Bytes angehängt — eine still beschädigte Wiederherstellung. Solche Antworten werden jetzt oberhalb von Offset 0 verworfen und der Block erneut versucht.
+- **Verlust von „Pause" bei zeitgleichem Fehler (BUG-02).** Trafen ein Worker-Absturz, ein Auth-Fehler oder ein Queue-Timeout mit einem gerade gedrückten „Pause"/„Abbrechen" zusammen, konnte der Nutzer-Klick verloren gehen. Diese Schreibvorgänge bewahren den zwischenzeitlich gesetzten Status jetzt.
+- **Hängende Upload-Queue nach hartem Prozess-Tod (OPS-01).** Der Upload-Pfad hat jetzt — wie der Restore-Pfad — ein Sicherheitsnetz, das nach einem PHP-Fatal das Queue-Lock freigibt und die Verarbeitung sofort wieder anstößt, statt bis zum Ablauf der Lock-Frist zu warten.
+
+### Datenschutz
+
+- **IPv6-Adressen im anonymisierten Protokoll-Export maskiert (PRIV-01).** Bisher wurden nur IPv4-Adressen ersetzt. Die Maskierung fängt jetzt auch IPv6, ohne Log-Zeitstempel zu zerstören.
+
+### Geändert
+
+- Entwickler-Werkzeuge innerhalb der bestehenden Versionsgrenzen aktualisiert (PHPUnit 11.5.56, PHPStan 2.2.5, WPCS 3.4.0 u. a.). Keine Auswirkung auf das ausgelieferte Plugin.
+- Dokumentation (ARCHITECTURE.md, SECURITY.md) auf den tatsächlichen Code-Stand korrigiert (Handler-Zahl, Tick-Budget, Log-Puffergröße, Lock-Logik).
+
 ## [1.0.7] — 2026-05-25
 
 Stabilitäts-Fix für große Uploads: die Worker-Crash-Wiederaufnahme hat bisher unbegrenzt lange versucht, an exakt der gleichen Stelle weiterzumachen, an der der PHP-Prozess gerade gestorben war — in der Praxis führte das zu einem 17-Stunden-Resume-Loop bei einer 172 MB großen `uploads.zip`, in der die Datei wiederholt bei 120 MB hängenblieb und die nachfolgende `wpcore.zip` deshalb nie hochgeladen wurde. Diese Version führt eine dreistufige Notbremse ein.
