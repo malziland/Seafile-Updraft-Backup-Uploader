@@ -39,6 +39,53 @@ defined( 'ABSPATH' ) || exit;
 trait SBU_Restore_Flow {
 
 	/**
+	 * Determine the committable prefix of a parallel range-download batch.
+	 *
+	 * Walks the batch from index 0 and counts the contiguous run of
+	 * successful chunks. A single failed chunk in the middle breaks the run —
+	 * downstream commit logic only writes an unbroken prefix starting at the
+	 * current file offset.
+	 *
+	 * The subtle case is HTTP 200: it means the server ignored our Range
+	 * header and returned the whole file from byte 0. That is only a valid
+	 * "whole file" result when we resume from offset 0. At any resumed
+	 * offset > 0, appending a full copy behind the bytes already on disk
+	 * corrupts the restore (BUG-01) — so such a 200 ends the prefix without
+	 * being counted, and the batch retries instead of committing garbage.
+	 *
+	 * @param array $results Range results ordered by chunk index; each entry
+	 *                       has 'ok' (bool), 'code' (int), 'bytes' (int).
+	 * @param int   $offset  Current file offset the batch resumes from.
+	 * @return array{count:int,bytes:int,whole_file:bool}
+	 */
+	private function ok_prefix( array $results, $offset ) {
+		$count      = 0;
+		$bytes      = 0;
+		$whole_file = false;
+		foreach ( $results as $r ) {
+			if ( empty( $r['ok'] ) ) {
+				break;
+			}
+			$is_whole = ( (int) ( $r['code'] ?? 0 ) === 200 );
+			if ( $is_whole && 0 !== (int) $offset ) {
+				// Range ignored mid-file — unusable, stop before it.
+				break;
+			}
+			++$count;
+			$bytes += (int) ( $r['bytes'] ?? 0 );
+			if ( $is_whole ) {
+				$whole_file = true;
+				break;
+			}
+		}
+		return array(
+			'count'      => $count,
+			'bytes'      => $bytes,
+			'whole_file' => $whole_file,
+		);
+	}
+
+	/**
 	 * Verify a restored file against its stored upload-time SHA1.
 	 *
 	 * @param string $filename Filename (for log messages).
@@ -457,20 +504,10 @@ trait SBU_Restore_Flow {
 				// only commits successful chunks whose offsets form an
 				// unbroken range starting at the current file offset.
 				ksort( $results );
-				$prefix_ok_count = 0;
-				$prefix_bytes    = 0;
-				$got_whole_file  = false;
-				foreach ( $results as $r ) {
-					if ( empty( $r['ok'] ) ) {
-						break;
-					}
-					++$prefix_ok_count;
-					$prefix_bytes += (int) ( $r['bytes'] ?? 0 );
-					if ( ( $r['code'] ?? 0 ) === 200 ) {
-						$got_whole_file = true;
-						break;
-					}
-				}
+				$prefix          = $this->ok_prefix( $results, $offset );
+				$prefix_ok_count = $prefix['count'];
+				$prefix_bytes    = $prefix['bytes'];
+				$got_whole_file  = $prefix['whole_file'];
 				$has_error      = $prefix_ok_count < count( $results );
 				$full_batch_ok  = ! $has_error;
 				$partial_prefix = $prefix_ok_count > 0 && $has_error;
@@ -705,7 +742,11 @@ trait SBU_Restore_Flow {
 							fclose( $th );
 						}
 						@unlink( $r['tmp'] );
-						if ( ( $r['code'] ?? 0 ) === 200 ) {
+						// A 200 is a whole-file result only at offset 0;
+						// ok_prefix() already stops the prefix before a mid-file
+						// 200, so this never fires with offset > 0 (BUG-01). The
+						// guard keeps the invariant explicit at the write site.
+						if ( ( $r['code'] ?? 0 ) === 200 && 0 === (int) $offset ) {
 							$got_whole_file = true;
 							$new_offset     = $fs;
 							++$i_written;
