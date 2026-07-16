@@ -2,7 +2,7 @@
 /**
  * Admin-Ajax handlers — ausgelagert aus SBU_Plugin (ARCH-001 Schritt 4).
  *
- * 24 Ajax-Endpoints für die Admin-Oberfläche: Verbindungstest, Upload/Restore-
+ * 22 Ajax-Endpoints für die Admin-Oberfläche: Verbindungstest, Upload/Restore-
  * Queue-Kontrolle, Backup-Liste, Download-Handler, Log-Export, Settings-
  * Autosave und die beiden extern erreichbaren Cron-Endpoints. Komplett als
  * Trait, weil die Methoden tief auf private SBU_Plugin-Helfer angewiesen sind

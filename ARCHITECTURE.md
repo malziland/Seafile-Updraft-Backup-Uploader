@@ -18,11 +18,11 @@ includes/
   class-sbu-crypto.php                AES-256-CBC (random IV, legacy IV migration)
   trait-sbu-upload-flow.php           upload queue, chunked upload, retry/backoff
   trait-sbu-restore-flow.php          restore queue, parallel Range download
-  trait-sbu-admin-ajax.php            20 admin AJAX handlers + 1 public cron-ping
+  trait-sbu-admin-ajax.php            22 admin AJAX handlers + 1 public cron-ping
 views/admin-page.php                  settings page template
 assets/js/admin.js                    admin UI (progress polling, pause/resume)
 assets/css/admin.css                  admin UI styles
-tests/                                PHPUnit 11 + Brain\Monkey (123 tests)
+tests/                                PHPUnit 11 + Brain\Monkey (132 tests)
 ```
 
 ## Module boundaries
@@ -40,7 +40,7 @@ in 1.0.3 and 1.0.4. What stays where, and why:
 | `SBU_Crypto` | AES-256-CBC + legacy IV migration | One-shot helper; lives alone so the key-derivation contract has a single owner. |
 | `SBU_Upload_Flow` (trait) | `process_queue_tick()`, chunk loop, `safe_queue_update()`, `upload_one_chunk()` | Trait rather than a collaborator so it can `$this->activity_logger` / `$this->get_settings()` cheaply; lives next to `SBU_Plugin` at runtime but is maintained as its own file. |
 | `SBU_Restore_Flow` (trait) | `process_restore_tick()`, parallel-range download pump | Same rationale as the upload flow — mirrors its structure and error handling. |
-| `SBU_Admin_Ajax_Controller` (trait) | 20 `ajax_*` endpoints, Nonce/cap gate, sanitizers | Lives in a trait so every AJAX entry point goes through the same `verify_ajax_request()` helper without a second class hop. |
+| `SBU_Admin_Ajax_Controller` (trait) | 22 `ajax_*` endpoints, Nonce/cap gate, sanitizers | Lives in a trait so every AJAX entry point goes through the same `verify_ajax_request()` helper without a second class hop. |
 
 ## Queue state machine
 
@@ -86,7 +86,10 @@ mirrors `process_queue_tick()`'s loop shape and retry semantics.
 ## Tick entry points
 
 Work is moved forward by *ticks*. A tick is one invocation of
-`process_queue_tick()` under the queue lock, bounded by `SBU_TICK_TIME` (55 s).
+`process_queue_tick()` under the queue lock. The per-tick budget is
+*adaptive* (`get_adaptive_limits()`): it scales with the server's
+`max_execution_time`, so a 60 s server picks ~55 s and a server with no
+limit is capped at the `SBU_TICK_TIME` ceiling of 250 s.
 There are four ways a tick gets fired:
 
 | Entry point | Trigger | Purpose |
@@ -108,7 +111,7 @@ Queue processing is serialised by a single lock option, `sbu_queue_lock`.
 ```php
 acquire_queue_lock( $ttl )    // atomic add_option — succeeds iff row absent
 release_queue_lock()          // delete the row
-queue_lock_ttl()              // SBU_TICK_TIME + 10 s safety margin
+queue_lock_ttl()              // adaptive tick_time + max(upload,download timeout) + 30 s
 ```
 
 Why `add_option` instead of `set_transient`? `add_option` is atomic at the DB
@@ -117,8 +120,9 @@ two-step read + write — two concurrent ticks both read "absent" and both
 write, both winning the race and entering `process_queue_tick()` at the same
 time — the atomic insert prevents that.
 
-Stale locks are picked up by comparing their embedded timestamp to
-`queue_lock_ttl()` + 30 s — a crashed worker doesn't wedge the queue forever.
+The lock row stores an absolute expiry (`time() + queue_lock_ttl()`). A new
+tick treats the lock as stale and takes it over once that expiry is in the
+past — a crashed worker doesn't wedge the queue forever.
 
 ## Retry and backoff
 
@@ -135,9 +139,11 @@ and schedules a WP-Cron tick at `time() + $delay`. The gate prevents any
 faster ticks (loopback, admin kick, stall check) from short-circuiting the
 wait.
 
-**Reset on success.** The first successful chunk after a failure clears both
-`retries` and `next_allowed_tick_ts` via `unset()` — a transient network
-blip doesn't leave a permanent slowdown behind.
+**Reset on success.** The first successful chunk after a failure clears
+`retries`, `crash_offset`, `crashes_at_offset` and `next_allowed_tick_ts` —
+a transient network blip doesn't leave a permanent slowdown behind. The
+`chunk_size_override` from a crash-driven shrink is *kept* for the rest of
+the file: a chunk that crashed once may crash again later in the same file.
 
 ## Crash detection
 
@@ -182,11 +188,11 @@ escalation:
 | `crashes_at_offset` | Counter — number of consecutive crashes at the same offset. |
 | `chunk_size_override` | Per-file override of `$queue['chunk_size']`. Set by step 2; read by `process_queue_tick()` to size each chunk request. |
 
-All three are cleared after the next *successful* chunk on this file —
-a one-off crash followed by recovery doesn't leave permanent state
-behind, but a chunk-size shrink that already helped is preserved for
-the rest of the file (a chunk that crashed once might crash again
-later in the same file).
+`crash_offset` and `crashes_at_offset` are cleared after the next
+*successful* chunk on this file — a one-off crash followed by recovery
+doesn't leave permanent state behind. The `chunk_size_override` from a
+shrink that already helped is **kept** for the rest of the file (a chunk
+that crashed once might crash again later in the same file).
 
 ### Tuning
 
@@ -212,19 +218,32 @@ Mid-tick writes must not overwrite a user-initiated terminal status
 private function safe_queue_update( array $queue ): string {
     wp_cache_delete( SBU_QUEUE, 'options' );
     $fresh = get_option( SBU_QUEUE );
-    $current = $fresh['status'] ?? '';
-    if ( in_array( $current, [ 'aborted', 'paused', 'error', 'done' ], true ) ) {
-        $queue['status'] = $current;    // preserve terminal
+    if ( is_array( $fresh ) ) {
+        $current = $fresh['status'] ?? '';
+        if ( in_array( $current, [ 'aborted', 'paused', 'error', 'done' ], true ) ) {
+            // Terminal in the DB: keep that status, but merge our
+            // progress fields into the fresh row so real work isn't lost.
+            foreach ( [ 'files', 'file_idx', 'ok', 'err', 'total_bytes' ] as $k ) {
+                if ( array_key_exists( $k, $queue ) ) {
+                    $fresh[ $k ] = $queue[ $k ];
+                }
+            }
+            $fresh['last_activity'] = time();
+            update_option( SBU_QUEUE, $fresh, false );
+            return $current;
+        }
     }
     update_option( SBU_QUEUE, $queue, false );
-    return $queue['status'];
+    return $queue['status'] ?? '';
 }
 ```
 
-Every mid-loop write inside the chunk iteration goes through this helper.
-The inner chunk loop also *reads* the fresh status after every chunk and
-breaks out on `aborted` / `paused` — the helper is a belt, the re-read is
-the suspenders.
+Every mid-loop write inside the chunk iteration goes through this helper —
+and, since the BUG-02 fix, so do the crash-recovery writes and the
+auth-failure / queue-timeout terminal writes, so none of them can clobber a
+concurrent Pause/Abort either. The inner chunk loop also *reads* the fresh
+status after every chunk and breaks out on `aborted` / `paused` — the helper
+is a belt, the re-read is the suspenders.
 
 ## SHA1 verification (strict mode)
 
@@ -251,7 +270,7 @@ bit-for-bit equality. It doubles bandwidth, which is why it's opt-in.
 ## Activity log
 
 Implemented by `SBU_Activity_Log` (extracted from `SBU_Plugin` in 1.0.3). A
-capped ring buffer (`SBU_ACTIVITY_MAX = 200`) stored in the
+capped ring buffer (`SBU_ACTIVITY_MAX = 500`) stored in the
 `sbu_activity_log` option. Every non-routine event appends an entry: upload
 start / success / failure / retry, crash detection, pause / resume / abort,
 SHA1 mismatch, slow chunks, duplicate detection, retention deletions,
@@ -286,7 +305,7 @@ automatically.
 ## Security boundaries
 
 - **All admin AJAX endpoints**: `manage_options` capability + nonce
-  (`verify_ajax_request()`). 20 admin endpoints total.
+  (`verify_ajax_request()`). 22 admin endpoints total.
 - **One public endpoint**: `sbu_cron_ping` — per-site 32-char secret,
   compared with `hash_equals()` for timing-safe equality. No other
   public surface.
@@ -332,7 +351,7 @@ What the current suite covers:
 | Log sanitization | `LogSanitizerTest.php` | Every masking rule, plus an end-to-end leak check |
 
 At the time of writing (PHP 8.5 runtime, PHPUnit 11.5.55) the suite reports
-**123 tests, 343 assertions**. The CI pipeline
+**132 tests, 374 assertions**. The CI pipeline
 (`.github/workflows/ci.yml`) runs PHPUnit across PHP 8.2 / 8.3 / 8.4 and
 gates merges on PHPCS (WordPress Coding Standards), PHPStan (level 5),
-and Gitleaks.
+Gitleaks, and a Composer dependency audit.

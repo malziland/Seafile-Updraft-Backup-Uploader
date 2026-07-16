@@ -95,7 +95,7 @@ seafile-updraft-backup-uploader/
 │   ├── css/admin.css                     — Admin-Styles
 │   └── js/admin.js                       — Admin-UI-Script
 ├── languages/                            — Übersetzungsdateien (DE/EN, .pot-Template)
-├── tests/                                — PHPUnit 11 + Brain\Monkey Test-Suite (123 Tests)
+├── tests/                                — PHPUnit 11 + Brain\Monkey Test-Suite (132 Tests)
 ├── scripts/                              — regen-pot.sh, check-i18n.sh
 ├── readme.txt                            — WordPress.org Plugin-Header
 ├── LICENSE                               — MIT
@@ -125,7 +125,7 @@ git clone https://github.com/malziland/Seafile-Updraft-Backup-Uploader.git
 cd Seafile-Updraft-Backup-Uploader
 composer install                                 # PHP 8.2+ erforderlich
 
-./vendor/bin/phpunit                             # 123 Tests / 343 Assertions
+./vendor/bin/phpunit                             # 132 Tests / 374 Assertions
 ./vendor/bin/phpcs --extensions=php \            # WordPress Coding Standards
     --ignore=vendor,languages,assets,tests,.github,scripts .
 ./vendor/bin/phpstan analyse --level=5 \         # statische Analyse

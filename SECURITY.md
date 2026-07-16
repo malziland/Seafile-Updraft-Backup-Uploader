@@ -19,7 +19,7 @@ Please do **not** open a public GitHub issue for security vulnerabilities.
 ## What's in scope
 
 - Authentication and session handling in WordPress admin pages.
-- AJAX endpoints exposed under `admin-ajax.php` (20 capability-protected admin actions plus the single public, key-protected `sbu_cron_ping`).
+- AJAX endpoints exposed under `admin-ajax.php` (22 capability-protected admin actions plus the single public, key-protected `sbu_cron_ping`).
 - Passwords at rest (AES-256-CBC with a random IV per encryption operation).
 - File-system interactions — the plugin writes to the UpdraftPlus backup directory only.
 - Seafile API interactions (HTTP requests to the configured Seafile instance).
