@@ -508,9 +508,9 @@ trait SBU_Restore_Flow {
 				$prefix_ok_count = $prefix['count'];
 				$prefix_bytes    = $prefix['bytes'];
 				$got_whole_file  = $prefix['whole_file'];
-				$has_error      = $prefix_ok_count < count( $results );
-				$full_batch_ok  = ! $has_error;
-				$partial_prefix = $prefix_ok_count > 0 && $has_error;
+				$has_error       = $prefix_ok_count < count( $results );
+				$full_batch_ok   = ! $has_error;
+				$partial_prefix  = $prefix_ok_count > 0 && $has_error;
 
 				// One-shot fast retry. Only attempted when nothing in the
 				// batch came back ok — a partial prefix means bytes are on
