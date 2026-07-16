@@ -32,6 +32,8 @@
         }
     },
     "scripts": {
+        "setup": "@composer install",
+        "build": "bash scripts/build-zip.sh",
         "lint": "find . -name '*.php' -not -path './vendor/*' -not -path './.git/*' -print0 | xargs -0 -n1 php -l",
         "phpcs": "phpcs --standard=WordPress --extensions=php --ignore=vendor,languages,assets,tests,.github .",
         "phpstan": "phpstan analyse --memory-limit=2G",

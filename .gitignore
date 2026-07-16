@@ -3,6 +3,7 @@
 
 # Release artifacts
 *.zip
+/dist/
 # rsync staging folder from the WP-zip build (same name as the plugin slug,
 # created in the project root when the zip is built in-place rather than
 # in /tmp/)
