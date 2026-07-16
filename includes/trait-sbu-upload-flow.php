@@ -66,7 +66,9 @@ trait SBU_Upload_Flow {
 			$existing['status'] = 'aborted';
 			update_option( SBU_QUEUE, $existing, false );
 			wp_clear_scheduled_hook( SBU_CRON_HOOK );
-			$this->queue_engine->release_lock();
+			// Force-release: we deliberately drop the running tick's lock so the
+			// new backup's queue can start — this request doesn't own it.
+			$this->queue_engine->force_release_lock();
 			delete_transient( 'sbu_progress' );
 			delete_option( 'sbu_abort_ts' );
 			delete_transient( 'sbu_abort_flag' );

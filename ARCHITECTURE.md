@@ -109,9 +109,10 @@ retry backoff — the gate bounces the premature ping.
 Queue processing is serialised by a single lock option, `sbu_queue_lock`.
 
 ```php
-acquire_queue_lock( $ttl )    // atomic add_option — succeeds iff row absent
-release_queue_lock()          // delete the row
-queue_lock_ttl()              // adaptive tick_time + max(upload,download timeout) + 30 s
+acquire_lock( $ttl )      // atomic add_option — succeeds iff row absent; stores exp + ownership token
+release_lock()            // delete the row only if it still carries OUR token
+force_release_lock()      // delete the row unconditionally (deliberate abort path)
+default_lock_ttl()        // adaptive tick_time + max(upload,download timeout) + 30 s
 ```
 
 Why `add_option` instead of `set_transient`? `add_option` is atomic at the DB
@@ -120,9 +121,20 @@ two-step read + write — two concurrent ticks both read "absent" and both
 write, both winning the race and entering `process_queue_tick()` at the same
 time — the atomic insert prevents that.
 
-The lock row stores an absolute expiry (`time() + queue_lock_ttl()`). A new
-tick treats the lock as stale and takes it over once that expiry is in the
-past — a crashed worker doesn't wedge the queue forever.
+The lock row stores `array( 'exp' => absolute expiry, 'tok' => ownership
+token )`. A new tick treats the lock as stale and takes it over once the
+expiry is in the past — a crashed worker doesn't wedge the queue forever.
+(Legacy mid-upgrade locks held a bare integer expiry; the expiry read
+tolerates both shapes.)
+
+**Ownership token (OPS-01).** `acquire_lock()` writes a fresh per-acquire
+token; `release_lock()` deletes the row *only if it still carries that
+token*. This closes a narrow race: if a tick times out and its lock goes
+stale, a second tick can take the lock over — the first tick's
+`register_shutdown_function` must then NOT delete the second tick's lock.
+The one place that intentionally drops a *foreign* lock is
+`on_backup_complete` (a new backup aborts a running queue); it calls
+`force_release_lock()`, which bypasses the token check by design.
 
 ## Retry and backoff
 

@@ -25,6 +25,16 @@ final class SBU_Queue_Engine {
 	const LOCK_OPTION = 'sbu_queue_lock';
 
 	/**
+	 * Ownership token of the lock this instance currently holds, or null when
+	 * it holds none. release_lock() only deletes a lock still carrying this
+	 * token, so a shutdown handler firing after a timed-out tick cannot free a
+	 * lock a concurrent tick has since taken over (OPS-01).
+	 *
+	 * @var string|null
+	 */
+	private $lock_token = null;
+
+	/**
 	 * Callable, liefert den aktuellen Cron-Key als String.
 	 *
 	 * @var callable
@@ -54,35 +64,80 @@ final class SBU_Queue_Engine {
 	 * Try to acquire the queue-processing lock atomically.
 	 *
 	 * Relies on `add_option()`'s built-in existence check so that two
-	 * concurrent ticks can't both enter process_queue_tick(). Stores the
-	 * lock's expiry timestamp so a process that died mid-tick doesn't
-	 * permanently wedge the queue: a lock whose expiry is in the past is
-	 * deleted and takeover is attempted.
+	 * concurrent ticks can't both enter process_queue_tick(). The lock row
+	 * carries its expiry timestamp plus a per-acquire ownership token: a lock
+	 * whose expiry is in the past is deleted and takeover is attempted, so a
+	 * process that died mid-tick doesn't permanently wedge the queue.
+	 *
+	 * The stored shape is `array( 'exp' => int, 'tok' => string )`. Legacy
+	 * mid-upgrade locks (< this version) held a bare integer expiry; the
+	 * expiry read below tolerates both so an in-flight upgrade never wedges.
 	 *
 	 * @param int $ttl Seconds until the lock is considered stale.
 	 * @return bool True if the caller now holds the lock.
 	 */
 	public function acquire_lock( $ttl ) {
 		wp_cache_delete( self::LOCK_OPTION, 'options' );
-		$existing = (int) get_option( self::LOCK_OPTION, 0 );
+		$existing = get_option( self::LOCK_OPTION, 0 );
+		$exp      = is_array( $existing ) ? (int) ( $existing['exp'] ?? 0 ) : (int) $existing;
 
-		if ( $existing > 0 && $existing > time() ) {
+		if ( $exp > 0 && $exp > time() ) {
 			return false;
 		}
-		if ( $existing > 0 ) {
+		if ( $exp > 0 ) {
 			delete_option( self::LOCK_OPTION );
 		}
 
-		return (bool) add_option( self::LOCK_OPTION, time() + $ttl, '', false );
+		$token = wp_generate_password( 12, false );
+		$ok    = (bool) add_option(
+			self::LOCK_OPTION,
+			array(
+				'exp' => time() + $ttl,
+				'tok' => $token,
+			),
+			'',
+			false
+		);
+		if ( $ok ) {
+			$this->lock_token = $token;
+		}
+		return $ok;
 	}
 
 	/**
-	 * Release the queue-processing lock. Also clears the legacy transient
-	 * from <1.2 installs mid-queue during the upgrade.
+	 * Release the queue-processing lock we hold — and only that one.
+	 *
+	 * Compares the stored ownership token against ours before deleting, so a
+	 * shutdown handler that fires after our tick timed out cannot delete a
+	 * lock a concurrent tick has since taken over (OPS-01). A caller that
+	 * never acquired holds no token and only clears the legacy transient.
+	 * Use {@see self::force_release_lock()} to deliberately drop another
+	 * tick's lock.
 	 */
 	public function release_lock() {
+		if ( null !== $this->lock_token ) {
+			wp_cache_delete( self::LOCK_OPTION, 'options' );
+			$existing = get_option( self::LOCK_OPTION, null );
+			$tok      = is_array( $existing ) ? ( $existing['tok'] ?? null ) : null;
+			if ( $tok === $this->lock_token ) {
+				delete_option( self::LOCK_OPTION );
+			}
+			$this->lock_token = null;
+		}
+		delete_transient( 'sbu_processing_lock' );
+	}
+
+	/**
+	 * Force-release the lock regardless of ownership.
+	 *
+	 * Only for the deliberate case where a new backup aborts a running queue
+	 * (on_backup_complete): the aborted tick's lock must go so the new queue
+	 * can start. Everything else must use {@see self::release_lock()}.
+	 */
+	public function force_release_lock() {
 		delete_option( self::LOCK_OPTION );
 		delete_transient( 'sbu_processing_lock' );
+		$this->lock_token = null;
 	}
 
 	/**
