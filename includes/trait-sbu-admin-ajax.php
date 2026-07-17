@@ -236,6 +236,14 @@ trait SBU_Admin_Ajax {
 		$is_restore             = ! empty( $queue['restore'] ) || isset( $queue['dir'] );
 		$queue['status']        = $is_restore ? 'restoring' : 'uploading';
 		$queue['last_activity'] = time();
+		// BUG-03: Pausendauer dem Timeout-Budget gutschreiben — der
+		// Queue-Timeout (queue_timed_out) zählt nur aktive Laufzeit. Ohne
+		// Gutschrift würde eine >12 h pausierte Queue direkt nach dem
+		// Weiterklicken vom Timeout abgebrochen.
+		$paused_ts = (int) ( $queue['paused_ts'] ?? 0 );
+		if ( $paused_ts > 0 ) {
+			$queue['idle_credit'] = (int) ( $queue['idle_credit'] ?? 0 ) + max( 0, time() - $paused_ts );
+		}
 		unset( $queue['paused_ts'], $queue['next_allowed_tick_ts'], $queue['next_retry_delay'] );
 		update_option( SBU_QUEUE, $queue, false );
 

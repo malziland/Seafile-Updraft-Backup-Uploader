@@ -7,7 +7,7 @@
  * Retention und History-Cleanup. Als Trait, weil der Flow tief in private
  * Plugin-Helfer greift (safe_queue_update, detect_worker_crash_and_defer,
  * maybe_notify_stall, get_adaptive_limits, tick_budget_exhausted,
- * compute_queue_timeout, is_aborted, log_failed_files, get_updraft_dir,
+ * queue_timed_out, is_aborted, log_failed_files, get_updraft_dir,
  * get_cron_key). Trait-Komposition hält alle Zugriffe intakt, ohne
  * Visibility-Promotion oder fragile Plugin-Referenzen.
  *
@@ -318,11 +318,11 @@ trait SBU_Upload_Flow {
 		// budget. The budget is sized from total bytes × 1.5 / expected
 		// throughput, floored at SBU_QUEUE_TIMEOUT so tiny backups still get
 		// the legacy 12 h grace, and capped at 24 h so a runaway can't hang
-		// forever.
-		$started = $queue['started'] ?? 0;
-		$timeout = $this->compute_queue_timeout( $queue );
-		if ( $started > 0 && ( time() - $started ) > $timeout ) {
-			$hours           = round( ( time() - $started ) / 3600, 1 );
+		// forever. Zählt nur aktive Laufzeit — Crash-Standzeiten und Pausen
+		// sind per 'idle_credit' gutgeschrieben (BUG-03, siehe
+		// queue_timed_out()).
+		$hours = $this->queue_timed_out( $queue );
+		if ( false !== $hours ) {
 			$queue['status'] = 'error';
 			// safe_queue_update() bewahrt ein nebenläufiges paused/aborted
 			// (BUG-02): der Timeout-Abbruch darf einen frischen Nutzer-Intent

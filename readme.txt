@@ -4,7 +4,7 @@ Tags: backup, seafile, updraftplus, chunked-upload, cloudflare
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.2
-Stable tag: 1.0.10
+Stable tag: 1.0.11
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -100,6 +100,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 
 == Changelog ==
 
+= 1.0.11 =
+* **Fix (wichtig):** Nach einem nächtlichen Absturz des Upload-Prozesses brach das Plugin den Upload beim Weitermachen fälschlich ab. Hintergrund: Eine Sicherheitsuhr stoppt Uploads, die insgesamt zu lange laufen — sie zählte aber auch die Stunden mit, in denen der Upload nach einem Absturz nur schlafend dalag. Im Praxisfall: 14 Stunden Stillstand, korrekte Wiederaufnahme durch den Admin-Fallback, zwei Minuten später Abbruch mit „Queue-Timeout" — obwohl nur noch rund 40 Minuten Arbeit übrig waren. Die Sicherheitsuhr zählt jetzt nur noch echte Arbeitszeit; Schlafzeiten nach Abstürzen und manuelle Pausen werden gutgeschrieben. Gegen wirklich hängende Uploads bleibt sie voll aktiv. Derselbe Fix schützt auch den Pause/Weiter-Knopf — eine lange pausierte Queue wäre sonst genauso abgebrochen worden. 150 Tests / 414 Assertions, alle grün.
+
 = 1.0.10 =
 * **Reliability:** Das Queue-Lock erhält einen Besitz-Nachweis (Ownership-Token). Bisher konnte in einem sehr engen Zeitfenster ein abgestürzter Verarbeitungs-Prozess beim Aufräumen versehentlich das Lock eines bereits nachgerückten Prozesses freigeben — mit dem Risiko, dass zwei Prozesse kurzzeitig parallel dieselbe Queue bearbeiten. Ein Prozess gibt jetzt nur noch das Lock frei, das er selbst hält; der bewusste Abbruch einer laufenden Queue durch ein neues Backup nutzt einen separaten Force-Pfad. Behebt das letzte offene Restrisiko aus dem internen Audit. 140 Tests / 389 Assertions, alle grün.
 
@@ -146,6 +149,9 @@ Nein. Das Plugin läuft durch einen internen WordPress-Loopback komplett eigenst
 * Erste öffentliche Version. Chunked Upload über Seafile-API, Stream-First-Restore mit Range-Chunk-Fallback, exponentielles Backoff mit zwei Kurven, Stillstand-Meldung per Mail ohne Abbruch, Zero-Traffic-Betrieb ohne externe Dienste, Pause/Resume mit Byte-Offset, Integritätsprüfung ohne Extra-Bandbreite, Lokal-Status-Badges im Backup-Browser, Erfolgs-Banner nach Restore mit UpdraftPlus-Deeplink, anonymisierter Log-Export, AIMD-Rate-Controller, AES-256 Passwortverschlüsselung, mehrsprachige Oberfläche. 87 Tests / 257 Assertions.
 
 == Upgrade Notice ==
+
+= 1.0.11 =
+Wichtiger Fix: Die Laufzeit-Sicherheitsuhr brach nach Absturz oder langer Pause korrekt fortgesetzte Uploads fälschlich ab („Queue-Timeout"). Sie zählt jetzt nur noch echte Arbeitszeit. Wer nächtliche Backups auf besucherarmen Sites fährt, sollte zeitnah aktualisieren. Keine Migration nötig.
 
 = 1.0.10 =
 Reliability-Verbesserung am Queue-Lock (Ownership-Token) — schließt ein enges Nebenläufigkeits-Restrisiko. Keine Migration nötig.

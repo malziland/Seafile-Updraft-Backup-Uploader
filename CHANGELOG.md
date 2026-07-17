@@ -4,6 +4,14 @@ Alle relevanten Änderungen an diesem Plugin werden in dieser Datei dokumentiert
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.0.11] — 2026-07-17
+
+Behebt einen Produktionsabbruch vom 17.07. (INTERIORISTA): Eine nach stillem Worker-Absturz korrekt wiederaufgenommene Queue wurde zwei Minuten später vom Queue-Timeout gekillt (BUG-03).
+
+### Behoben
+
+- **Queue-Timeout zählt nur noch aktive Laufzeit (BUG-03).** Der Timeout-Check verglich stur `time() - started` mit dem Laufzeit-Budget (Floor 12 h). Starb der Worker still (SIGKILL/OOM — dagegen greift kein Shutdown-Handler) und lag die Queue auf einer Zero-Traffic-Site stundenlang tot, zählte die Standzeit voll gegen das Budget: Der Admin-Fallback nahm die Queue korrekt wieder auf, der nächste Timeout-Check brach sie sofort ab (Produktionslog: „Queue-Timeout nach 14.8h: 34 OK, 0 Fehler" — bei nur noch ~40 min Restarbeit). Neu bankt `detect_worker_crash_and_defer()` die gemessene Standzeit als `idle_credit` auf der Queue (beide Zweige: Backoff-Wiederaufnahme und Datei-Skip); `ajax_resume_upload()` schreibt analog die Pausendauer gut — eine länger als das Budget pausierte Queue wäre nach dem Weiterklicken identisch gestorben. Der neue zentrale Check `queue_timed_out()` zieht die Gutschrift ab; für echte aktive Laufzeit bleibt das Budget als Sicherheitsnetz gegen Endlosschleifen unverändert bestehen. Gilt für Upload- und Restore-Queues (gemeinsamer Check in `process_queue_tick`). Abgesichert durch `QueueTimeoutTest` (5 Fälle, inkl. 1:1-Nachstellung des Produktionslogs) sowie neue Fälle in `CrashDetectionGateTest` und `PauseResumeTest`. 150 Tests / 414 Assertions, alle grün.
+
 ## [1.0.10] — 2026-07-16
 
 Behebt das letzte offene Restrisiko aus dem Re-Audit (OPS-01).

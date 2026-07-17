@@ -327,6 +327,68 @@ final class CrashDetectionGateTest extends TestCase {
     }
 
     // =====================================================================
+    // idle_credit (BUG-03)
+    // =====================================================================
+
+    /**
+     * BUG-03: the measured dead time must be banked as idle_credit so the
+     * queue timeout only budgets active runtime. Without this, a queue
+     * resumed after a long silent crash is killed by the very next
+     * timeout check (production log 2026-07-17: 14.3 h dead → "Queue-
+     * Timeout nach 14.8h" two minutes after resume).
+     */
+    public function test_crash_banks_idle_time_as_credit(): void {
+        $queue = $this->baseQueue( [ 'last_activity' => time() - 500 ] );
+        $this->options[ SBU_QUEUE ] = $queue;
+
+        $this->callPrivate( $this->plugin, 'detect_worker_crash_and_defer', [ $queue ] );
+
+        $credit = $this->options[ SBU_QUEUE ]['idle_credit'] ?? 0;
+        $this->assertGreaterThanOrEqual( 500, $credit );
+        $this->assertLessThanOrEqual( 510, $credit, 'credit must be the measured idle, not more' );
+    }
+
+    /**
+     * Repeated crashes accumulate: each detection adds its own idle window
+     * on top of what earlier crashes already banked.
+     */
+    public function test_crash_accumulates_idle_credit(): void {
+        $queue = $this->baseQueue( [
+            'last_activity' => time() - 500,
+            'idle_credit'   => 1_000,
+        ] );
+        $this->options[ SBU_QUEUE ] = $queue;
+
+        $this->callPrivate( $this->plugin, 'detect_worker_crash_and_defer', [ $queue ] );
+
+        $credit = $this->options[ SBU_QUEUE ]['idle_credit'] ?? 0;
+        $this->assertGreaterThanOrEqual( 1_500, $credit );
+        $this->assertLessThanOrEqual( 1_510, $credit );
+    }
+
+    /**
+     * The give-up branch (file skipped after retry cap) banks the idle
+     * time too — the queue continues with the next files and must not
+     * inherit a burned budget from the stall it just escaped.
+     */
+    public function test_crash_skip_banks_idle_time_as_credit(): void {
+        $queue = $this->baseQueue( [
+            'last_activity' => time() - 10_000,
+            'files'         => [
+                [ 'path' => '/srv/backup-uploads.zip', 'retries' => 42, 'offset' => 0 ],
+                [ 'path' => '/srv/backup-wpcore.zip', 'retries' => 0, 'offset' => 0 ],
+            ],
+        ] );
+        $this->options[ SBU_QUEUE ] = $queue;
+
+        $this->callPrivate( $this->plugin, 'detect_worker_crash_and_defer', [ $queue ] );
+
+        $credit = $this->options[ SBU_QUEUE ]['idle_credit'] ?? 0;
+        $this->assertGreaterThanOrEqual( 10_000, $credit );
+        $this->assertLessThanOrEqual( 10_010, $credit );
+    }
+
+    // =====================================================================
     // Fixtures
     // =====================================================================
 

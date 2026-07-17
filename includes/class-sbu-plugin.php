@@ -530,6 +530,35 @@ final class SBU_Plugin {
 		return max( (int) SBU_QUEUE_TIMEOUT, min( $est, 86400 ) );
 	}
 
+	/**
+	 * Hat die Queue ihr Laufzeit-Budget überschritten? Zählt nur aktive
+	 * Laufzeit: 'idle_credit' sammelt Standzeiten, in denen nachweislich
+	 * nicht gearbeitet wurde — stille Worker-Abstürze (gutgeschrieben in
+	 * detect_worker_crash_and_defer) und Pausen (gutgeschrieben in
+	 * ajax_resume_upload).
+	 *
+	 * BUG-03: Ohne die Gutschrift zählte der Timeout die tote Standzeit
+	 * mit — ein Worker starb still um 00:16, der Admin-Fallback nahm die
+	 * Queue um 14:33 korrekt wieder auf, und zwei Minuten später brach der
+	 * Timeout sie mit „14.8h" ab, obwohl nur ~40 min Arbeit übrig waren
+	 * (34 OK / 0 Fehler, Produktionslog 2026-07-17).
+	 *
+	 * @param array $queue Queue snapshot.
+	 * @return float|false Aktive Laufzeit in Stunden wenn überschritten, sonst false.
+	 * @phpstan-impure
+	 */
+	private function queue_timed_out( array $queue ) {
+		$started = (int) ( $queue['started'] ?? 0 );
+		if ( $started <= 0 ) {
+			return false;
+		}
+		$active = time() - $started - (int) ( $queue['idle_credit'] ?? 0 );
+		if ( $active <= $this->compute_queue_timeout( $queue ) ) {
+			return false;
+		}
+		return round( $active / 3600, 1 );
+	}
+
 	/** Cached adaptive limits for the current request. */
 	private $adaptive_limits_cache = null;
 
@@ -862,6 +891,11 @@ final class SBU_Plugin {
 		} elseif ( $total_retries >= self::CRASH_RETRY_CAP ) {
 			$give_up = true;
 		}
+
+		// BUG-03: Die tote Standzeit dem Timeout-Budget gutschreiben — der
+		// Queue-Timeout darf nur aktive Laufzeit zählen, sonst killt er die
+		// gerade wiederaufgenommene Queue beim nächsten Tick.
+		$queue['idle_credit'] = (int) ( $queue['idle_credit'] ?? 0 ) + $idle;
 
 		if ( $give_up ) {
 			$queue['files'][ $idx ]['status'] = 'error';

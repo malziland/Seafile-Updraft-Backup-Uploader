@@ -148,6 +148,39 @@ final class PauseResumeTest extends TestCase {
         $this->assertStringContainsString( 'backup-db.gz', $log );
     }
 
+    /**
+     * BUG-03: the pause duration must be banked as idle_credit so the
+     * queue timeout only budgets active runtime — otherwise a queue
+     * paused for longer than the budget is aborted right after Resume.
+     */
+    public function test_resume_banks_pause_duration_as_idle_credit(): void {
+        $this->options[ SBU_QUEUE ] = $this->pausedQueue( [
+            'paused_ts' => time() - 3_600,
+        ] );
+
+        $this->invokeExpectingJson( 'ajax_resume_upload' );
+
+        $credit = $this->options[ SBU_QUEUE ]['idle_credit'] ?? 0;
+        $this->assertGreaterThanOrEqual( 3_600, $credit );
+        $this->assertLessThanOrEqual( 3_610, $credit, 'credit must be the pause duration, not more' );
+    }
+
+    /**
+     * Several pause/resume cycles accumulate their durations.
+     */
+    public function test_resume_accumulates_idle_credit_across_pauses(): void {
+        $this->options[ SBU_QUEUE ] = $this->pausedQueue( [
+            'paused_ts'   => time() - 100,
+            'idle_credit' => 500,
+        ] );
+
+        $this->invokeExpectingJson( 'ajax_resume_upload' );
+
+        $credit = $this->options[ SBU_QUEUE ]['idle_credit'] ?? 0;
+        $this->assertGreaterThanOrEqual( 600, $credit );
+        $this->assertLessThanOrEqual( 610, $credit );
+    }
+
     // =====================================================================
     // Pause → Resume roundtrip
     // =====================================================================
